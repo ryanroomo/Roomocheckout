@@ -160,6 +160,7 @@ function CheckoutForm({ amount, deliveryFee }) {
         <PaymentElement
           options={{
             layout: "tabs",
+            paymentMethodOrder: ["card"],
             style: {
               base: {
                 fontFamily: font,
