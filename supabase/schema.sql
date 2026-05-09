@@ -18,6 +18,7 @@ create table if not exists orders (
 
   -- delivery
   delivery_address text not null,
+  delivery_unit text,
   delivery_city text not null,
   delivery_state text not null,
   delivery_zip text not null,

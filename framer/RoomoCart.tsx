@@ -1017,9 +1017,11 @@ function computeBookedSlots(): Set<string> {
 const BOOKED_SLOTS = computeBookedSlots()
 
 function StepDate({
+    checkoutBaseUrl,
     onBack,
     onNext,
 }: {
+    checkoutBaseUrl: string
     onBack: () => void
     onNext: (date: string, slot: string) => void
 }) {
@@ -1028,6 +1030,17 @@ function StepDate({
     const [showSlotPicker, setShowSlotPicker] = useState(false)
     const [viewMonth, setViewMonth] = useState(5)
     const [viewYear, setViewYear] = useState(2026)
+    const [realBooked, setRealBooked] = useState<Set<string>>(new Set())
+
+    // Fetch real booked slots from Supabase via the Next.js API
+    useEffect(() => {
+        if (!checkoutBaseUrl) return
+        const base = checkoutBaseUrl.replace(/\/$/, "")
+        fetch(`${base}/api/booked-slots`)
+            .then((r) => r.json())
+            .then((d) => setRealBooked(new Set(d.slots || [])))
+            .catch(() => {})
+    }, [checkoutBaseUrl])
 
     const monthNames = [
         "January",
@@ -1054,8 +1067,10 @@ function StepDate({
         return d.getDay() !== 0
     }
 
-    const isBooked = (dateStr: string, period: string) =>
-        BOOKED_SLOTS.has(`${dateStr}-${period}`)
+    const isBooked = (dateStr: string, period: string) => {
+        const key = `${dateStr}-${period}`
+        return BOOKED_SLOTS.has(key) || realBooked.has(key)
+    }
 
     const fmt = (day: number) =>
         `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
@@ -1449,6 +1464,7 @@ function StepAddress({
         email: "",
         phone: "",
         address: "",
+        unit: "",
         city: "",
         state: "NY",
         zip: "",
@@ -1551,6 +1567,12 @@ function StepAddress({
                     value={f.address}
                     onChange={(e) => s("address", e.target.value)}
                 />
+                <input
+                    style={inp}
+                    placeholder="Apt / Unit / Suite (optional)"
+                    value={f.unit}
+                    onChange={(e) => s("unit", e.target.value)}
+                />
                 <div style={{ display: "flex", gap: 8 }}>
                     <input
                         style={{ ...inp, flex: 2 }}
@@ -1638,6 +1660,7 @@ function StepPayment({
         name: `${address?.firstName || ""} ${address?.lastName || ""}`.trim(),
         phone: address?.phone || "",
         address: address?.address || "",
+        unit: address?.unit || "",
         city: address?.city || "",
         state: address?.state || "",
         zip: address?.zip || "",
@@ -1942,6 +1965,7 @@ function CartPanel({ checkoutBaseUrl }: { checkoutBaseUrl: string }) {
                                 )}
                                 {step === 2 && (
                                     <StepDate
+                                        checkoutBaseUrl={checkoutBaseUrl}
                                         onBack={() => setStep(1)}
                                         onNext={(d, s) => {
                                             setDeliveryDate(d)

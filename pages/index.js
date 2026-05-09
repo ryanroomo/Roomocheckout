@@ -244,6 +244,7 @@ export default function CheckoutPage() {
     const name = params.get("name");
     const phone = params.get("phone");
     const address = params.get("address");
+    const unit = params.get("unit");
     const city = params.get("city");
     const state = params.get("state");
     const zip = params.get("zip");
@@ -263,6 +264,7 @@ export default function CheckoutPage() {
         name,
         phone,
         address,
+        unit,
         city,
         state,
         zip,

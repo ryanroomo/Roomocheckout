@@ -30,6 +30,7 @@ export default async function handler(req, res) {
       name,
       phone,
       address,
+      unit,
       city,
       state,
       zip,
@@ -64,7 +65,14 @@ export default async function handler(req, res) {
         email,
         name,
         phone,
-        address: { line1: address, city, state, postal_code: zip, country: "US" },
+        address: {
+          line1: address,
+          line2: unit || undefined,
+          city,
+          state,
+          postal_code: zip,
+          country: "US",
+        },
       });
     }
 
@@ -107,6 +115,7 @@ export default async function handler(req, res) {
       .insert({
         customer_id: dbCustomer.id,
         delivery_address: address,
+        delivery_unit: unit || null,
         delivery_city: city,
         delivery_state: state,
         delivery_zip: zip,
