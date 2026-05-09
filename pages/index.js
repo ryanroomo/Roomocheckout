@@ -9,7 +9,7 @@ import {
 import Head from "next/head";
 
 const stripePromise = loadStripe(
-  "pk_test_51TUG2KB0HZJIYdlbHEGaVobI0jpfxYz4p9P5Rv4hG1ljLnfRa1RNwsluCdZeCCSscr0iXe4gyUXMqp0TmH7wsKDb00hX9LeiXS"
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 );
 
 // ─── Styles ──────────────────────────────────────────────────
