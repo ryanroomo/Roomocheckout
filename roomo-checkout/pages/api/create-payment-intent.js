@@ -54,11 +54,12 @@ export default async function handler(req, res) {
       });
     }
 
-    // Create payment intent
+    // Create payment intent — card only (includes Apple Pay / Google Pay)
     const paymentIntent = await stripe.paymentIntents.create({
       amount: totalCents,
       currency: "usd",
       customer: customer.id,
+      payment_method_types: ["card"],
       metadata: {
         items: JSON.stringify(items),
         deliveryDate: deliveryDate || "",
