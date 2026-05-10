@@ -211,6 +211,11 @@ export default async function handler(req, res) {
             ]
               .filter(Boolean)
               .join(", "),
+            deliveryStreet: order.delivery_address || "",
+            deliveryUnit: order.delivery_unit || "",
+            deliveryCity: order.delivery_city || "",
+            deliveryState: order.delivery_state || "",
+            deliveryZip: order.delivery_zip || "",
             deliveryFee: order.delivery_fee_cents / 100,
             monthlyRent: order.rental_monthly_cents / 100,
             buyTotal: order.buy_total_cents / 100,
