@@ -1561,7 +1561,15 @@ function StepPayment({
     }, [onSuccess])
 
     return (
-        <div style={{ paddingBottom: 40 }}>
+        <div
+            style={{
+                display: "flex",
+                flexDirection: "column",
+                flex: 1,
+                minHeight: 0,
+                paddingBottom: 40,
+            }}
+        >
             <Dots step={4} total={5} />
             <button
                 onClick={onBack}
@@ -1627,10 +1635,11 @@ function StepPayment({
                     src={iframeSrc}
                     style={{
                         width: "100%",
-                        height: "calc(100vh - 240px)",
-                        minHeight: 400,
+                        flex: 1,
+                        minHeight: 0,
                         border: "none",
                         borderRadius: 12,
+                        display: "block",
                     }}
                     allow="payment"
                 />
@@ -1762,8 +1771,9 @@ function CartPanel({ checkoutBaseUrl }: { checkoutBaseUrl: string }) {
                             zIndex: 9999,
                             background: C.bg,
                             boxShadow: "0 8px 40px rgba(73,55,42,0.15)",
-                            overflowY: "auto",
-                            overflowX: "hidden",
+                            display: "flex",
+                            flexDirection: "column",
+                            overflow: "hidden",
                             ...(isMobile
                                 ? {
                                       bottom: 0,
@@ -1820,6 +1830,14 @@ function CartPanel({ checkoutBaseUrl }: { checkoutBaseUrl: string }) {
                                 animate={{ opacity: 1, x: 0 }}
                                 exit={{ opacity: 0, x: -16 }}
                                 transition={{ duration: 0.2 }}
+                                style={{
+                                    flex: 1,
+                                    minHeight: 0,
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    overflowY: "auto",
+                                    overflowX: "hidden",
+                                }}
                             >
                                 {step === 0 && (
                                     <StepCart
