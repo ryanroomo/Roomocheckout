@@ -47,11 +47,17 @@ export default async function handler(req, res) {
     const depositCents = DEPOSIT_CENTS;
     const deliveryFeeCents = Math.max(0, Math.round(Number(deliveryFee) || 0)) * 100;
 
+    // Normalize mode: Framer cart may not send "mode", infer from months
+    const normalized = items.map((i) => ({
+      ...i,
+      mode: i.mode || (Number(i.months) > 0 ? "rent" : "buy-new"),
+    }));
+
     // Compute future-billing amounts so stage 2 can read them straight from the DB.
-    const rentalMonthlyCents = items
+    const rentalMonthlyCents = normalized
       .filter((i) => i.mode === "rent")
       .reduce((sum, i) => sum + Math.round(Number(i.price) || 0) * 100, 0);
-    const buyTotalCents = items
+    const buyTotalCents = normalized
       .filter((i) => i.mode === "buy-new")
       .reduce((sum, i) => sum + Math.round(Number(i.price) || 0) * 100, 0);
 
@@ -132,11 +138,11 @@ export default async function handler(req, res) {
       .single();
     if (orderErr) throw new Error(`orders insert: ${orderErr.message}`);
 
-    if (items.length > 0) {
-      const rows = items.map((i) => ({
+    if (normalized.length > 0) {
+      const rows = normalized.map((i) => ({
         order_id: order.id,
         set_type: i.set,
-        mode: i.mode || (i.months > 0 ? "rent" : "buy-new"),
+        mode: i.mode,
         palette: i.palette || null,
         months: Number(i.months) || 0,
         price_cents: Math.round(Number(i.price) || 0) * 100,
