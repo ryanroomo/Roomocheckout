@@ -15,10 +15,22 @@ export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
   try {
+    // Slots are blocked by:
+    //   - any committed order (deposit_paid / balance_charged / delivered)
+    //   - recently-created pending orders (< 30 min) — gives the user time to finish
+    //     payment without instantly hogging the slot for everyone else.
+    // Older pending orders (abandoned checkouts) are ignored so their slots free up.
+    const PENDING_TTL_MIN = 30;
+    const cutoff = new Date(
+      Date.now() - PENDING_TTL_MIN * 60 * 1000
+    ).toISOString();
+
     const { data, error } = await supabase
       .from("orders")
       .select("delivery_date, delivery_slot")
-      .in("status", ["pending", "deposit_paid", "balance_charged", "delivered"])
+      .or(
+        `status.in.(deposit_paid,balance_charged,delivered),and(status.eq.pending,created_at.gte.${cutoff})`
+      )
       .not("delivery_date", "is", null)
       .not("delivery_slot", "is", null);
 

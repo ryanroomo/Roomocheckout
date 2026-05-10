@@ -43,34 +43,172 @@ export default async function handler(req, res) {
 
   try {
     switch (event.type) {
+      // ── Deposit payment ────────────────────────────────────────
       case "payment_intent.succeeded": {
         const pi = event.data.object;
+
+        // Ignore pre-auth captures (those are handled by admin/capture)
+        if (pi.capture_method === "manual") break;
+
         const paymentMethodId =
           typeof pi.payment_method === "string" ? pi.payment_method : null;
 
+        // Set refund_deadline = delivery_date − 48h
+        const { data: order } = await supabase
+          .from("orders")
+          .select("id, delivery_date")
+          .eq("stripe_payment_intent_id", pi.id)
+          .single();
+
+        const updates = {
+          status: "deposit_paid",
+          stripe_payment_method_id: paymentMethodId,
+        };
+
+        if (order?.delivery_date) {
+          updates.refund_deadline = new Date(
+            new Date(order.delivery_date).getTime() - 48 * 60 * 60 * 1000
+          ).toISOString();
+        }
+
         const { error } = await supabase
           .from("orders")
-          .update({
-            status: "deposit_paid",
-            stripe_payment_method_id: paymentMethodId,
-          })
+          .update(updates)
           .eq("stripe_payment_intent_id", pi.id);
         if (error) throw error;
+
+        // Record deposit in payments ledger
+        if (order) {
+          await supabase.from("payments").insert({
+            order_id: order.id || undefined,
+            type: "deposit",
+            amount_cents: pi.amount,
+            stripe_payment_intent_id: pi.id,
+            status: "succeeded",
+            description: `$25 deposit paid`,
+          });
+        }
         break;
       }
 
       case "payment_intent.payment_failed": {
         const pi = event.data.object;
+
+        const { data: failedOrder } = await supabase
+          .from("orders")
+          .select("id")
+          .eq("stripe_payment_intent_id", pi.id)
+          .single();
+
         const { error } = await supabase
           .from("orders")
           .update({ status: "failed" })
           .eq("stripe_payment_intent_id", pi.id);
         if (error) throw error;
+
+        // Record failure in payments ledger
+        if (failedOrder) {
+          await supabase.from("payments").insert({
+            order_id: failedOrder.id,
+            type: "deposit",
+            amount_cents: pi.amount,
+            stripe_payment_intent_id: pi.id,
+            status: "failed",
+            description: `Deposit payment failed: ${pi.last_payment_error?.message || "unknown error"}`,
+          });
+        }
+        break;
+      }
+
+      // ── Subscription: monthly rent paid ────────────────────────
+      case "invoice.paid": {
+        const invoice = event.data.object;
+        const subId = invoice.subscription;
+        if (!subId) break; // not a subscription invoice
+
+        // Skip the first invoice if it's $0 (trial period)
+        if (invoice.amount_paid === 0) break;
+
+        // Find the order by subscription ID
+        const { data: order } = await supabase
+          .from("orders")
+          .select("id")
+          .eq("stripe_subscription_id", subId)
+          .single();
+
+        if (order) {
+          await supabase.from("payments").insert({
+            order_id: order.id,
+            type: "subscription",
+            amount_cents: invoice.amount_paid,
+            stripe_invoice_id: invoice.id,
+            status: "succeeded",
+            description: `Monthly rent: $${(invoice.amount_paid / 100).toFixed(2)}`,
+          });
+        }
+        break;
+      }
+
+      // ── Subscription: payment failed ───────────────────────────
+      case "invoice.payment_failed": {
+        const invoice = event.data.object;
+        const subId = invoice.subscription;
+        if (!subId) break;
+
+        const { data: order } = await supabase
+          .from("orders")
+          .select("id")
+          .eq("stripe_subscription_id", subId)
+          .single();
+
+        if (order) {
+          // Record the failure
+          await supabase.from("payments").insert({
+            order_id: order.id,
+            type: "subscription",
+            amount_cents: invoice.amount_due,
+            stripe_invoice_id: invoice.id,
+            status: "failed",
+            description: `Monthly rent failed: attempt ${invoice.attempt_count}`,
+          });
+
+          // After Stripe exhausts retries (default 3), mark delinquent
+          // Stripe's smart retries will try ~3 times over ~3 weeks
+          if (invoice.attempt_count >= 3) {
+            await supabase
+              .from("orders")
+              .update({
+                status: "delinquent",
+                delinquent_at: new Date().toISOString(),
+              })
+              .eq("id", order.id);
+          }
+        }
+        break;
+      }
+
+      // ── Subscription ended (term complete or cancelled) ────────
+      case "customer.subscription.deleted": {
+        const sub = event.data.object;
+
+        const { data: order } = await supabase
+          .from("orders")
+          .select("id, status")
+          .eq("stripe_subscription_id", sub.id)
+          .single();
+
+        if (order && order.status === "active") {
+          // Normal completion — term ended
+          await supabase
+            .from("orders")
+            .update({ status: "completed" })
+            .eq("id", order.id);
+        }
+        // If status is already "delinquent", leave it as-is for manual review
         break;
       }
 
       default:
-        // Other events ignored for now
         break;
     }
 
