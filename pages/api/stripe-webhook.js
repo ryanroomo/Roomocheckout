@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import { supabase } from "../../lib/supabase";
+import { sendOrderConfirmation } from "../../lib/email";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2024-06-20",
@@ -87,6 +88,28 @@ export default async function handler(req, res) {
             status: "succeeded",
             description: `$25 deposit paid`,
           });
+
+          // Send confirmation email
+          try {
+            // Fetch full order + items + customer for the email
+            const { data: fullOrder } = await supabase
+              .from("orders")
+              .select("*, order_items(*), customers(*)")
+              .eq("id", order.id)
+              .single();
+
+            if (fullOrder?.customers?.email) {
+              await sendOrderConfirmation({
+                email: fullOrder.customers.email,
+                name: fullOrder.customers.name,
+                order: fullOrder,
+                items: fullOrder.order_items || [],
+              });
+            }
+          } catch (emailErr) {
+            // Email failure should NOT block the webhook response
+            console.error("Confirmation email failed (non-fatal):", emailErr);
+          }
         }
         break;
       }
