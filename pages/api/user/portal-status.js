@@ -256,7 +256,7 @@ export default async function handler(req, res) {
 
       const rentItems = (order.order_items || []).filter((i) => i.mode === "rent");
       const totalBuyPrice = rentItems.reduce(
-        (sum, item) => sum + (BASE_12MO_CENTS[item.set_type] || item.price_cents) * 13,
+        (sum, item) => sum + (BASE_12MO_CENTS[item.set_type] || item.price_cents) * 16,
         0
       );
 
