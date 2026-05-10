@@ -36,18 +36,15 @@ function verifyAdmin(req) {
 // ── Price tables (must match Framer RoomoCart.tsx) ────────────
 
 function calcBuyPrice(setType, monthlyCents) {
-  // Buy price = 12-month tier monthly × 16 (matches RoomoCart getBuyPrice)
-  // Since we store monthly price at the tier the user chose,
-  // and buy = 16× the 12-mo rate, we need the 12-mo base prices.
+  // Buy price = 12-month tier (lowest) monthly × 13
   const BASE_12MO = {
     living: 349_00,
     dining: 249_00,
     bedding: 199_00,
   };
-  // Fallback: if set_type not recognized, use the stored monthly × 16
   const base = BASE_12MO[setType];
-  if (base) return base * 16;
-  return monthlyCents * 16;
+  if (base) return base * 13;
+  return monthlyCents * 13;
 }
 
 // ── Calculate buyout ─────────────────────────────────────────
