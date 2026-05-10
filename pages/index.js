@@ -236,31 +236,6 @@ export default function CheckoutPage() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Tell the parent page (Framer) our real content height so the iframe can resize itself.
-  // Debounced so we don't flood the parent during Stripe form animations.
-  useEffect(() => {
-    let timer = null;
-    let lastSent = 0;
-    const send = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        const h = Math.ceil(document.documentElement.scrollHeight);
-        if (Math.abs(h - lastSent) < 4) return; // skip noise
-        lastSent = h;
-        window.parent.postMessage({ type: "roomo-iframe-height", height: h }, "*");
-      }, 80);
-    };
-    send();
-    const ro = new ResizeObserver(send);
-    ro.observe(document.documentElement);
-    window.addEventListener("load", send);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("load", send);
-      clearTimeout(timer);
-    };
-  }, []);
-
   useEffect(() => {
     // Read params from URL (passed by Framer iframe)
     const params = new URLSearchParams(window.location.search);
@@ -323,11 +298,12 @@ export default function CheckoutPage() {
           href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
           rel="stylesheet"
         />
+        {/* Make sure body fills the iframe with cream so any unused space looks intentional. */}
+        <style>{`html, body { margin: 0; background: ${C.bg}; }`}</style>
       </Head>
 
       <div
         style={{
-          minHeight: "100vh",
           background: C.bg,
           fontFamily: font,
           padding: "20px 16px",

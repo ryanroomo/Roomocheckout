@@ -1648,35 +1648,15 @@ function StepPayment({
         ? `${checkoutBaseUrl}?${params.toString()}`
         : ""
 
-    const [iframeHeight, setIframeHeight] = useState(620)
-
-    // Listen for payment success + dynamic height from iframe.
-    // Throttled with rAF and ignored when height didn't really change — avoids
-    // React error #419 (Suspense interrupted by mid-hydration setState).
+    // Listen for payment success from iframe
     useEffect(() => {
-        let frame: any = null
         const handler = (e: MessageEvent) => {
             if (e.data?.type === "roomo-payment-success") {
                 onSuccess()
             }
-            if (
-                e.data?.type === "roomo-iframe-height" &&
-                typeof e.data.height === "number"
-            ) {
-                const next = Math.max(500, Math.round(e.data.height))
-                if (frame) cancelAnimationFrame(frame)
-                frame = requestAnimationFrame(() => {
-                    setIframeHeight((prev: number) =>
-                        Math.abs(prev - next) < 4 ? prev : next
-                    )
-                })
-            }
         }
         window.addEventListener("message", handler)
-        return () => {
-            window.removeEventListener("message", handler)
-            if (frame) cancelAnimationFrame(frame)
-        }
+        return () => window.removeEventListener("message", handler)
     }, [onSuccess])
 
     return (
@@ -1746,10 +1726,10 @@ function StepPayment({
                     src={iframeSrc}
                     style={{
                         width: "100%",
-                        height: iframeHeight,
+                        height: "calc(100vh - 240px)",
+                        minHeight: 400,
                         border: "none",
                         borderRadius: 12,
-                        transition: "height 0.25s ease",
                     }}
                     allow="payment"
                 />
