@@ -388,90 +388,63 @@ function StepCart({
                 ))}
             </div>
 
-            {/* Totals */}
+            {/* Cart totals (small, above cream box) */}
+            {(totalMonthly > 0 || totalBuy > 0) && (
+                <div
+                    style={{
+                        fontFamily: font,
+                        fontSize: 11,
+                        color: C.muted,
+                        textAlign: "center",
+                        marginBottom: 8,
+                    }}
+                >
+                    {totalMonthly > 0 && (
+                        <span>Monthly ${totalMonthly}/mo</span>
+                    )}
+                    {totalMonthly > 0 && totalBuy > 0 && (
+                        <span> · </span>
+                    )}
+                    {totalBuy > 0 && (
+                        <span>One-time ${totalBuy.toLocaleString()}</span>
+                    )}
+                </div>
+            )}
+
+            {/* Due today */}
             <div
                 style={{
                     background: C.cream,
                     borderRadius: 12,
-                    padding: "12px 16px",
-                    marginBottom: 14,
+                    padding: "20px 16px",
+                    marginBottom: 10,
+                    textAlign: "center",
                 }}
             >
-                {totalMonthly > 0 && (
-                    <div
-                        style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            marginBottom: totalBuy > 0 ? 8 : 0,
-                        }}
-                    >
-                        <div
-                            style={{
-                                fontFamily: font,
-                                fontSize: 12,
-                                fontWeight: 600,
-                                color: C.muted,
-                                textTransform: "uppercase",
-                                letterSpacing: "0.06em",
-                            }}
-                        >
-                            Monthly
-                        </div>
-                        <div
-                            style={{
-                                fontFamily: font,
-                                fontSize: 20,
-                                fontWeight: 800,
-                                color: C.brown,
-                            }}
-                        >
-                            ${totalMonthly}
-                            <span
-                                style={{
-                                    fontSize: 12,
-                                    fontWeight: 500,
-                                    color: C.brownMuted,
-                                }}
-                            >
-                                {" "}
-                                /mo
-                            </span>
-                        </div>
-                    </div>
-                )}
-                {totalBuy > 0 && (
-                    <div
-                        style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                        }}
-                    >
-                        <div
-                            style={{
-                                fontFamily: font,
-                                fontSize: 12,
-                                fontWeight: 600,
-                                color: C.muted,
-                                textTransform: "uppercase",
-                                letterSpacing: "0.06em",
-                            }}
-                        >
-                            One-time
-                        </div>
-                        <div
-                            style={{
-                                fontFamily: font,
-                                fontSize: 20,
-                                fontWeight: 800,
-                                color: C.brown,
-                            }}
-                        >
-                            ${totalBuy.toLocaleString()}
-                        </div>
-                    </div>
-                )}
+                <div
+                    style={{
+                        fontFamily: font,
+                        fontSize: 32,
+                        fontWeight: 800,
+                        color: C.brown,
+                        lineHeight: 1.1,
+                        marginBottom: 4,
+                    }}
+                >
+                    $25
+                </div>
+                <div
+                    style={{
+                        fontFamily: font,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: C.brownMuted,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                    }}
+                >
+                    Due today
+                </div>
             </div>
 
             <div
@@ -481,9 +454,10 @@ function StepCart({
                     color: C.muted,
                     textAlign: "center",
                     marginBottom: 14,
+                    lineHeight: 1.5,
                 }}
             >
-                Includes delivery & assembly · Tax at checkout
+                Fully refundable. Monthly plan starts at delivery.
             </div>
 
             <button
@@ -503,7 +477,7 @@ function StepCart({
                     marginBottom: 8,
                 }}
             >
-                Checkout →
+                Reserve Now →
             </button>
             <button
                 onClick={onContinueShopping}
@@ -658,6 +632,7 @@ const NYC_ZIPS = new Set([
 ])
 
 const JC_ZIPS = new Set([
+    "07030", // Hoboken
     "07302",
     "07304",
     "07305",
@@ -1574,11 +1549,20 @@ function StepPayment({
         ? `${checkoutBaseUrl}?${params.toString()}`
         : ""
 
-    // Listen for payment success from iframe
+    const [iframeHeight, setIframeHeight] = useState(620)
+
+    // Listen for payment success + dynamic height from iframe
     useEffect(() => {
         const handler = (e: MessageEvent) => {
             if (e.data?.type === "roomo-payment-success") {
                 onSuccess()
+            }
+            if (
+                e.data?.type === "roomo-iframe-height" &&
+                typeof e.data.height === "number"
+            ) {
+                // Min 500 to avoid jumpiness during initial load.
+                setIframeHeight(Math.max(500, e.data.height))
             }
         }
         window.addEventListener("message", handler)
@@ -1652,9 +1636,10 @@ function StepPayment({
                     src={iframeSrc}
                     style={{
                         width: "100%",
-                        height: 620,
+                        height: iframeHeight,
                         border: "none",
                         borderRadius: 12,
+                        transition: "height 0.25s ease",
                     }}
                     allow="payment"
                 />

@@ -236,6 +236,23 @@ export default function CheckoutPage() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Tell the parent page (Framer) our real content height so the iframe can resize itself.
+  // Re-runs on any layout change (Stripe form expanding, error messages, etc.)
+  useEffect(() => {
+    const send = () => {
+      const h = Math.ceil(document.documentElement.scrollHeight);
+      window.parent.postMessage({ type: "roomo-iframe-height", height: h }, "*");
+    };
+    send();
+    const ro = new ResizeObserver(send);
+    ro.observe(document.documentElement);
+    window.addEventListener("load", send);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("load", send);
+    };
+  }, []);
+
   useEffect(() => {
     // Read params from URL (passed by Framer iframe)
     const params = new URLSearchParams(window.location.search);
