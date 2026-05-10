@@ -237,11 +237,18 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(true);
 
   // Tell the parent page (Framer) our real content height so the iframe can resize itself.
-  // Re-runs on any layout change (Stripe form expanding, error messages, etc.)
+  // Debounced so we don't flood the parent during Stripe form animations.
   useEffect(() => {
+    let timer = null;
+    let lastSent = 0;
     const send = () => {
-      const h = Math.ceil(document.documentElement.scrollHeight);
-      window.parent.postMessage({ type: "roomo-iframe-height", height: h }, "*");
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const h = Math.ceil(document.documentElement.scrollHeight);
+        if (Math.abs(h - lastSent) < 4) return; // skip noise
+        lastSent = h;
+        window.parent.postMessage({ type: "roomo-iframe-height", height: h }, "*");
+      }, 80);
     };
     send();
     const ro = new ResizeObserver(send);
@@ -250,6 +257,7 @@ export default function CheckoutPage() {
     return () => {
       ro.disconnect();
       window.removeEventListener("load", send);
+      clearTimeout(timer);
     };
   }, []);
 
