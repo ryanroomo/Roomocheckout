@@ -219,6 +219,12 @@ const C = {
 }
 const font = "'Manrope', 'League Spartan', sans-serif"
 
+function trackEvent(name: string, params?: Record<string, any>) {
+    if (typeof window !== "undefined" && (window as any).gtag) {
+        ;(window as any).gtag("event", name, params)
+    }
+}
+
 function useIsMobile() {
     const [m, setM] = useState(false)
     useEffect(() => {
@@ -753,6 +759,7 @@ function StepZip({
 
     const handleCheck = () => {
         const z = zip.trim()
+        trackEvent("check_zipcode", { zip: z })
         if (NYC_ZIPS.has(z)) setStatus("nyc")
         else if (JC_ZIPS.has(z)) setStatus("jc")
         else setStatus("no")
@@ -1385,14 +1392,15 @@ function StepDate({
             </div>
 
             <button
-                onClick={() =>
-                    selectedDate &&
-                    selectedSlot &&
-                    onNext(
-                        selectedDate,
-                        selectedSlot === "am" ? "9 AM – 1 PM" : "2 PM – 6 PM"
-                    )
-                }
+                onClick={() => {
+                    if (selectedDate && selectedSlot) {
+                        trackEvent("select_delivery_date", { date: selectedDate, slot: selectedSlot })
+                        onNext(
+                            selectedDate,
+                            selectedSlot === "am" ? "9 AM – 1 PM" : "2 PM – 6 PM"
+                        )
+                    }
+                }}
                 disabled={!selectedDate || !selectedSlot}
                 style={{
                     width: "100%",
@@ -1805,6 +1813,107 @@ function StepPayment({
 
 // ─── Shared Floating Panel ──────────────────────────────────────
 
+const NEWSLETTER_DISMISSED_KEY = "roomo-newsletter-dismissed"
+const NEWSLETTER_API = "https://www.roomonyc.com/api/newsletter-subscribe"
+
+function isNewsletterDismissed() {
+    try { return localStorage.getItem(NEWSLETTER_DISMISSED_KEY) === "1" } catch { return false }
+}
+function markNewsletterDismissed() {
+    try { localStorage.setItem(NEWSLETTER_DISMISSED_KEY, "1") } catch {}
+}
+
+function ExitNewsletter({ onClose, isMobile }: { onClose: () => void; isMobile: boolean }) {
+    const [email, setEmail] = useState("")
+    const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle")
+
+    const handleSubmit = async () => {
+        const trimmed = email.trim()
+        if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return
+        setStatus("sending")
+        try {
+            const res = await fetch(NEWSLETTER_API, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: trimmed }),
+            })
+            if (!res.ok) throw new Error("fail")
+            setStatus("success")
+            markNewsletterDismissed()
+            trackEvent("newsletter_signup", { source: "cart_exit" })
+            setTimeout(onClose, 2000)
+        } catch {
+            setStatus("error")
+            setTimeout(() => setStatus("idle"), 2500)
+        }
+    }
+
+    const handleSkip = () => {
+        markNewsletterDismissed()
+        onClose()
+    }
+
+    return (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, padding: "20px 0", textAlign: "center", gap: 20 }}>
+            {status === "success" ? (
+                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+                    <div style={{ fontSize: 40, lineHeight: 1 }}>✓</div>
+                    <span style={{ fontFamily: font, fontSize: 18, fontWeight: 700, color: C.brown }}>You're in! Check your inbox.</span>
+                </motion.div>
+            ) : (
+                <>
+                    <div style={{ fontFamily: font, fontSize: isMobile ? 20 : 22, fontWeight: 700, color: C.brown, lineHeight: 1.3 }}>
+                        Not ready yet?
+                    </div>
+                    <div style={{ fontFamily: font, fontSize: 32, fontWeight: 800, color: C.brown, letterSpacing: "-0.02em", lineHeight: 1 }}>
+                        10% OFF
+                    </div>
+                    <div style={{ fontFamily: font, fontSize: 13, color: C.muted, lineHeight: 1.5, maxWidth: 280 }}>
+                        Join our newsletter and enjoy 10% off your first month. You can always come back later.
+                    </div>
+                    <input
+                        type="email"
+                        placeholder="Email Address"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleSubmit() } }}
+                        style={{
+                            width: "100%", maxWidth: 300, height: 48, borderRadius: 8,
+                            border: `1.5px solid ${C.border}`, background: "#fff",
+                            padding: "0 16px", fontFamily: font, fontSize: 14, color: C.brown,
+                            outline: "none", boxSizing: "border-box",
+                        }}
+                    />
+                    <motion.button
+                        onClick={handleSubmit}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.97 }}
+                        style={{
+                            width: "100%", maxWidth: 300, height: 48, borderRadius: 999,
+                            border: "none", background: status === "error" ? "#C44B4B" : C.brown,
+                            color: "#fff", fontFamily: font, fontSize: 14, fontWeight: 700,
+                            letterSpacing: "0.05em", cursor: status === "sending" ? "wait" : "pointer",
+                            opacity: status === "sending" ? 0.7 : 1,
+                        }}
+                    >
+                        {status === "sending" ? "..." : status === "error" ? "Oops, try again" : "GET 10% OFF"}
+                    </motion.button>
+                    <button
+                        onClick={handleSkip}
+                        style={{
+                            background: "none", border: "none", fontFamily: font, fontSize: 13,
+                            color: C.muted, cursor: "pointer", textDecoration: "underline",
+                            padding: 4,
+                        }}
+                    >
+                        No thanks
+                    </button>
+                </>
+            )}
+        </div>
+    )
+}
+
 function CartPanel({ checkoutBaseUrl }: { checkoutBaseUrl: string }) {
     const cart = useCart()
     const open = useCartOpen()
@@ -1814,6 +1923,8 @@ function CartPanel({ checkoutBaseUrl }: { checkoutBaseUrl: string }) {
     const [deliveryFee, setDeliveryFee] = useState(0)
     const [deliveryDate, setDeliveryDate] = useState("")
     const [deliverySlot, setDeliverySlot] = useState("")
+    const [showExitNL, setShowExitNL] = useState(false)
+    const checkoutDoneRef = useRef(false)
 
     // Prevent duplicate panels — only the first mounted instance renders
     const idRef = useRef(Math.random())
@@ -1830,8 +1941,21 @@ function CartPanel({ checkoutBaseUrl }: { checkoutBaseUrl: string }) {
     const isOwner = (window as any).__roomoCartPanelId === idRef.current
 
     useEffect(() => {
-        if (open) setStep(0)
+        if (open) {
+            setStep(0)
+            setShowExitNL(false)
+            checkoutDoneRef.current = false
+        }
     }, [open])
+
+    const handleClose = () => {
+        if (!checkoutDoneRef.current && !isNewsletterDismissed() && !showExitNL) {
+            setShowExitNL(true)
+            trackEvent("cart_exit_newsletter_shown")
+            return
+        }
+        setCartOpen(false)
+    }
 
     if (!isOwner) return null
 
@@ -1844,7 +1968,7 @@ function CartPanel({ checkoutBaseUrl }: { checkoutBaseUrl: string }) {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.2 }}
-                        onClick={() => setCartOpen(false)}
+                        onClick={handleClose}
                         style={{
                             position: "fixed",
                             inset: 0,
@@ -1895,18 +2019,19 @@ function CartPanel({ checkoutBaseUrl }: { checkoutBaseUrl: string }) {
                         }}
                     >
                         <button
-                            onClick={() => setCartOpen(false)}
+                            onClick={showExitNL ? () => setCartOpen(false) : handleClose}
                             style={{
                                 position: "absolute",
-                                top: isMobile ? 16 : 18,
-                                right: isMobile ? 16 : 18,
+                                top: isMobile ? 8 : 10,
+                                right: isMobile ? 8 : 10,
                                 background: "none",
                                 border: "none",
                                 fontSize: 20,
                                 color: C.muted,
                                 cursor: "pointer",
-                                padding: 4,
+                                padding: 12,
                                 lineHeight: 1,
+                                zIndex: 10,
                             }}
                         >
                             ✕
@@ -1922,6 +2047,9 @@ function CartPanel({ checkoutBaseUrl }: { checkoutBaseUrl: string }) {
                                 }}
                             />
                         )}
+                        {showExitNL ? (
+                            <ExitNewsletter onClose={() => setCartOpen(false)} isMobile={isMobile} />
+                        ) : (
                         <AnimatePresence mode="wait">
                             <motion.div
                                 key={step}
@@ -1942,9 +2070,7 @@ function CartPanel({ checkoutBaseUrl }: { checkoutBaseUrl: string }) {
                                     <StepCart
                                         cart={cart}
                                         onRemove={(id) => removeFromCart(id)}
-                                        onContinueShopping={() =>
-                                            setCartOpen(false)
-                                        }
+                                        onContinueShopping={handleClose}
                                         onCheckout={() => setStep(1)}
                                     />
                                 )}
@@ -1989,6 +2115,7 @@ function CartPanel({ checkoutBaseUrl }: { checkoutBaseUrl: string }) {
                                         deliveryDate={deliveryDate}
                                         deliverySlot={deliverySlot}
                                         onSuccess={() => {
+                                            checkoutDoneRef.current = true
                                             setTimeout(() => {
                                                 setCart([])
                                                 setCartOpen(false)
@@ -1998,6 +2125,7 @@ function CartPanel({ checkoutBaseUrl }: { checkoutBaseUrl: string }) {
                                 )}
                             </motion.div>
                         </AnimatePresence>
+                        )}
                     </motion.div>
                 </>
             )}
@@ -2063,6 +2191,14 @@ function getGalleryImage(): string {
 function getBuyPrice(set: SetType, state: any): number {
     // Force 12-month tier for base calculation
     const s12 = { ...state, months: 12 }
+
+    // Mattress is not recouped (hygiene) so its buy multiplier is lower
+    if (set === "bedding" && s12.hasMattress) {
+        const base = getPrice(set, { ...s12, hasMattress: false }) // frame only
+        const mattressPremium = getPrice(set, s12) - base          // $70
+        return base * 16 + mattressPremium * 10                     // $2,064 + $700 = $2,764
+    }
+
     const monthlyAt12 = getPrice(set, s12)
     return monthlyAt12 * 16 // Brand New = 16× the 12-mo monthly
 }
@@ -2120,6 +2256,7 @@ export default function RoomoAddToCart(props: AddToCartProps) {
             excluded,
             image,
         })
+        trackEvent("add_to_cart", { set, mode: isBuy ? "buy-new" : "rent", price })
         setCartOpen(true)
     }
 
