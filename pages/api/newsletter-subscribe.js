@@ -21,18 +21,30 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Upsert into Supabase — if email already exists, update name + timestamp
+    // Insert or update — never overwrite a name with null
+    const cleanEmail = email.toLowerCase().trim();
+    const cleanName = (first_name || "").trim() || null;
+    const source = cleanName ? "popup" : "footer";
+
+    // Check if subscriber already exists
+    const { data: existing } = await supabase
+      .from("newsletter_subscribers")
+      .select("id, first_name")
+      .eq("email", cleanEmail)
+      .maybeSingle();
+
+    const row = {
+      email: cleanEmail,
+      first_name: cleanName || (existing?.first_name ?? null),
+      subscribed_at: new Date().toISOString(),
+      source: existing ? existing.first_name ? undefined : source : source,
+    };
+    // Remove undefined keys
+    if (row.source === undefined) delete row.source;
+
     const { error: dbError } = await supabase
       .from("newsletter_subscribers")
-      .upsert(
-        {
-          email: email.toLowerCase().trim(),
-          first_name: (first_name || "").trim() || null,
-          subscribed_at: new Date().toISOString(),
-          source: first_name ? "popup" : "footer",
-        },
-        { onConflict: "email" }
-      );
+      .upsert(row, { onConflict: "email" });
 
     if (dbError) throw dbError;
 
