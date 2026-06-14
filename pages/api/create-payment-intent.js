@@ -37,6 +37,7 @@ export default async function handler(req, res) {
       deliveryDate,
       deliverySlot,
       deliveryFee = 0,
+      couponCode = null,
     } = req.body;
 
     if (!email || !address || !city || !state || !zip) {
@@ -60,6 +61,37 @@ export default async function handler(req, res) {
     const buyTotalCents = normalized
       .filter((i) => i.mode === "buy-new")
       .reduce((sum, i) => sum + Math.round(Number(i.price) || 0) * 100, 0);
+
+    // ── Validate & record coupon if provided ────────────────
+    let validatedCoupon = null;
+    let discountCents = 0;
+    if (couponCode) {
+      const { data: coupon } = await supabase
+        .from("coupons")
+        .select("*")
+        .eq("code", couponCode.trim().toUpperCase())
+        .eq("active", true)
+        .maybeSingle();
+
+      if (coupon) {
+        const notExpired = !coupon.expires_at || new Date(coupon.expires_at) >= new Date();
+        const hasStarted = !coupon.starts_at || new Date(coupon.starts_at) <= new Date();
+        const hasUses = coupon.max_uses === null || coupon.current_uses < coupon.max_uses;
+        if (notExpired && hasStarted && hasUses) {
+          validatedCoupon = coupon;
+          if (coupon.discount_type === "percentage") {
+            discountCents = Math.round(rentalMonthlyCents * (coupon.discount_value / 100));
+          } else {
+            discountCents = Math.round(Number(coupon.discount_value) * 100);
+          }
+          // Increment usage
+          await supabase
+            .from("coupons")
+            .update({ current_uses: coupon.current_uses + 1 })
+            .eq("id", coupon.id);
+        }
+      }
+    }
 
     // ── 1) Stripe customer (find by email or create) ─────────
     const customers = await stripe.customers.list({ email, limit: 1 });
@@ -95,6 +127,8 @@ export default async function handler(req, res) {
         deliverySlot: deliverySlot || "",
         deliveryFee: String(deliveryFee || 0),
         itemCount: String(items.length),
+        couponCode: validatedCoupon ? validatedCoupon.code : "",
+        discountCents: String(discountCents),
       },
       receipt_email: email,
       description: `Roomo $25 deposit – ${items.length} set(s)`,
@@ -131,6 +165,8 @@ export default async function handler(req, res) {
         deposit_cents: depositCents,
         rental_monthly_cents: rentalMonthlyCents,
         buy_total_cents: buyTotalCents,
+        coupon_code: validatedCoupon ? validatedCoupon.code : null,
+        discount_cents: discountCents,
         stripe_payment_intent_id: paymentIntent.id,
         status: "pending",
       })

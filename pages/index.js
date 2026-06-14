@@ -251,6 +251,7 @@ export default function CheckoutPage() {
     const fee = parseInt(params.get("deliveryFee") || "0", 10);
     const deliveryDate = params.get("deliveryDate");
     const deliverySlot = params.get("deliverySlot");
+    const couponCode = params.get("couponCode");
 
     setDeliveryFee(fee);
 
@@ -271,6 +272,7 @@ export default function CheckoutPage() {
         deliveryDate,
         deliverySlot,
         deliveryFee: fee,
+        couponCode: couponCode || null,
       }),
     })
       .then((res) => res.json())

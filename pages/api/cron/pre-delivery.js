@@ -64,11 +64,15 @@ export default async function handler(req, res) {
         let authAmountCents;
         let securityDepositCents = 0;
 
+        // Coupon discount (applies to first month only)
+        const couponDiscount = order.discount_cents || 0;
+
         if (isRental) {
-          // First month + one month security deposit − $25 deposit already paid
+          // First month (minus coupon) + one month security deposit − $25 deposit already paid
           securityDepositCents = order.rental_monthly_cents;
           authAmountCents =
-            order.rental_monthly_cents * 2 +
+            (order.rental_monthly_cents - couponDiscount) +
+            order.rental_monthly_cents +
             order.delivery_fee_cents -
             order.deposit_cents;
         } else if (isBuy) {
@@ -78,10 +82,11 @@ export default async function handler(req, res) {
             order.delivery_fee_cents -
             order.deposit_cents;
         } else {
-          // Mixed order: rental monthly + buy total + delivery − $25
+          // Mixed order: rental monthly (minus coupon) + security deposit + buy total + delivery − $25
           securityDepositCents = order.rental_monthly_cents;
           authAmountCents =
-            order.rental_monthly_cents * 2 +
+            (order.rental_monthly_cents - couponDiscount) +
+            order.rental_monthly_cents +
             order.buy_total_cents +
             order.delivery_fee_cents -
             order.deposit_cents;
@@ -114,7 +119,7 @@ export default async function handler(req, res) {
             security_deposit_cents: String(securityDepositCents),
           },
           description: isRental
-            ? `Roomo pre-auth: 1st month + deposit – delivery ${order.delivery_date}`
+            ? `Roomo pre-auth: 1st month${couponDiscount > 0 ? ` (${order.coupon_code} -$${(couponDiscount / 100).toFixed(0)})` : ""} + deposit – delivery ${order.delivery_date}`
             : `Roomo pre-auth: purchase – delivery ${order.delivery_date}`,
         });
 
