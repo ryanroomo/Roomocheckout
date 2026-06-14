@@ -48,28 +48,30 @@ export default async function handler(req, res) {
 
     if (dbError) throw dbError;
 
-    // ── Klaviyo: subscribe to list via Client API ──────────────
+    // ── Klaviyo: subscribe to list via Server API ──────────────
     try {
-      const klaviyoRes = await fetch("https://a.klaviyo.com/client/subscriptions/", {
+      const klaviyoRes = await fetch("https://a.klaviyo.com/api/profile-subscription-bulk-create-jobs/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Klaviyo-Company-Id": "Wkkqmr",
-          revision: "2024-10-15",
+          "Authorization": `Klaviyo-API-Key ${process.env.KLAVIYO_PRIVATE_KEY}`,
+          "revision": "2024-10-15",
         },
         body: JSON.stringify({
           data: {
-            type: "subscription",
+            type: "profile-subscription-bulk-create-job",
             attributes: {
               custom_source: "Roomo Website",
-              profile: {
-                data: {
-                  type: "profile",
-                  attributes: {
-                    email: email.toLowerCase().trim(),
-                    first_name: (first_name || "").trim() || undefined,
+              profiles: {
+                data: [
+                  {
+                    type: "profile",
+                    attributes: {
+                      email: cleanEmail,
+                      first_name: cleanName || undefined,
+                    },
                   },
-                },
+                ],
               },
             },
             relationships: {
