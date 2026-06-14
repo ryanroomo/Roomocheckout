@@ -76,7 +76,7 @@ export default async function handler(req, res) {
               list: {
                 data: {
                   type: "list",
-                  id: "01KSNKBTZR8BM9EYCFA01Z3ZDD",
+                  id: "R7Xwtk",
                 },
               },
             },
