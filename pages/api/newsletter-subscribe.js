@@ -50,7 +50,7 @@ export default async function handler(req, res) {
 
     // ── Klaviyo: subscribe to list via Client API ──────────────
     try {
-      await fetch("https://a.klaviyo.com/client/subscriptions/", {
+      const klaviyoRes = await fetch("https://a.klaviyo.com/client/subscriptions/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -83,8 +83,11 @@ export default async function handler(req, res) {
           },
         }),
       });
+      if (!klaviyoRes.ok) {
+        const errBody = await klaviyoRes.text();
+        console.error(`Klaviyo API ${klaviyoRes.status}: ${errBody}`);
+      }
     } catch (klaviyoErr) {
-      // Don't fail the request if Klaviyo is down — Supabase has the record
       console.error("Klaviyo subscribe error:", klaviyoErr);
     }
 
