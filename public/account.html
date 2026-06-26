@@ -1057,6 +1057,47 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
   </div>
 </div>
 
+<!-- Cancel Order Modal -->
+<div class="modal-overlay" id="cancelModal">
+  <div class="modal" style="max-width:420px">
+    <div id="cancelStep1">
+      <div style="text-align:center;padding:var(--space-md) 0 0">
+        <div style="width:56px;height:56px;margin:0 auto var(--space-md);background:rgba(180,60,40,0.08);border-radius:50%;display:flex;align-items:center;justify-content:center">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a03020" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        </div>
+        <div style="font-family:var(--font-heading);font-weight:700;font-size:20px;color:var(--text-primary);margin-bottom:var(--space-sm)">Cancel your order?</div>
+        <p style="font-size:14px;color:#816E68;line-height:1.6;margin-bottom:var(--space-lg)">
+          This will cancel your delivery and refund your $25 deposit. The refund typically takes 5–10 business days to appear.
+        </p>
+      </div>
+      <div class="modal-actions">
+        <a class="btn btn-ghost" href="#" onclick="closeCancelModal();return false;">Keep my order</a>
+        <a class="btn btn-primary" href="#" id="confirmCancelBtn" style="background:#a03020;border-color:#a03020" onclick="confirmCancelOrder();return false;">Yes, cancel order</a>
+      </div>
+    </div>
+    <div id="cancelStep2" style="display:none">
+      <div style="text-align:center;padding:var(--space-xl) 0">
+        <div style="width:64px;height:64px;margin:0 auto var(--space-lg);background:var(--bg-secondary);border-radius:50%;display:flex;align-items:center;justify-content:center">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent-olive)" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <div style="font-family:var(--font-heading);font-weight:700;font-size:22px;color:var(--text-primary);margin-bottom:var(--space-sm)">Order Cancelled</div>
+        <p style="font-size:14px;color:#816E68;margin-bottom:var(--space-lg);line-height:1.6">Your $25 deposit will be refunded in 5–10 business days. A confirmation email has been sent.</p>
+        <a class="btn btn-primary" href="#" onclick="closeCancelModal();window.location.reload();return false;">Done</a>
+      </div>
+    </div>
+    <div id="cancelError" style="display:none">
+      <div style="text-align:center;padding:var(--space-xl) 0">
+        <div style="width:64px;height:64px;margin:0 auto var(--space-lg);background:rgba(180,60,40,0.08);border-radius:50%;display:flex;align-items:center;justify-content:center">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#a03020" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <div style="font-family:var(--font-heading);font-weight:700;font-size:20px;color:var(--text-primary);margin-bottom:var(--space-sm)">Something went wrong</div>
+        <p style="font-size:14px;color:#816E68;margin-bottom:var(--space-lg);line-height:1.6" id="cancelErrorMsg">Please try again or contact support@roomonyc.com.</p>
+        <a class="btn btn-primary" href="#" onclick="closeCancelModal();return false;">Close</a>
+      </div>
+    </div>
+  </div>
+</div>
+
 <footer class="footer">
   <div class="footer-top">
     <a href="https://www.roomonyc.com" target="_blank" class="footer-logo">ROOMO</a>
@@ -1526,7 +1567,8 @@ const STATUS = {
   6: { hero: { label: 'Action Required', title: 'Payment action needed.', subtitle: 'We were unable to process your latest Roomo payment. Please update your payment method to keep your plan active.', cta: 'Update Payment Method', links: ['View Payment History', 'Contact Support'] } },
   7: { hero: { label: 'Term Ending', title: 'Your rental term is ending soon.', get hint() { return 'Term ends ' + BACKEND.lease.endDateFull; }, cta: 'Manage End of Term' } },
   8: { hero: { label: 'Return Scheduled', title: 'Your return is scheduled.', hint: '', cta: 'Manage Return' } },
-  9: { hero: { label: 'Plan Ended', title: 'Your Roomo plan has ended.', subtitle: 'Thank you for living with Roomo. You can review your past orders or start a new plan anytime.', cta: 'Start a New Plan', links: ['View Order History', 'Download Receipts', 'Contact Support'] } }
+  9: { hero: { label: 'Plan Ended', title: 'Your Roomo plan has ended.', subtitle: 'Thank you for living with Roomo. You can review your past orders or start a new plan anytime.', cta: 'Start a New Plan', links: ['View Order History', 'Download Receipts', 'Contact Support'] } },
+  10: { hero: { label: 'Cancelled', title: 'Your order has been cancelled.', subtitle: 'Your deposit has been refunded. You can start a new order anytime.', cta: 'Start a New Plan', links: ['Contact Support'] } }
 };
 
 function planCard(s, bc, bt, full=false) {
@@ -1677,6 +1719,7 @@ function getOverviewContent(s) {
     case 7: return `<div class="cards-grid">${endOfTermCard()}${planCard(7,'badge-pending','Ending Soon',true)}</div>`;
     case 8: { const _rp9 = window._returnPickup||{}; const _rd9Main = _rp9.dateMain||'June 14'; const _rd9Year = _rp9.year||'2027'; const _rd9Slot = _rp9.slot||'9:00 AM – 1:00 PM'; return `<div class="cards-grid"><div class="card card-plan-h card-full animate-in">${planImageBlock(8)}<div class="plan-content"><div class="card-header"><span class="card-title">Return Scheduled</span><span class="card-badge badge-scheduled">Ending</span></div><div style="margin-bottom:var(--space-md)"><div style="font-family:var(--font-heading);font-weight:700;font-size:17px;color:var(--text-primary);margin-bottom:8px">${setLabel(CONFIRMED_PLAN.setId)} Set</div><div style="font-size:13px;color:#816E68">${colorDisplayName(CONFIRMED_PLAN.colorSlug)} · ${CONFIRMED_PLAN.months}-month rental</div></div><div style="border-top:1px solid var(--border-light);padding-top:var(--space-md)"><div style="font-size:11px;font-weight:500;color:var(--text-muted);text-transform:uppercase;margin-bottom:var(--space-xs)">Return Pickup</div><div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:var(--space-sm)"><div><div style="font-family:var(--font-heading);font-weight:700;font-size:20px;color:var(--text-primary);line-height:1.15;margin-bottom:4px">${_rd9Main}, ${_rd9Year}</div><div style="font-size:13px;color:#816E68">${_rd9Slot}</div></div><div style="font-size:13px;color:#816E68;text-align:right">${_addrShort()}</div></div></div><div class="card-actions"><a class="btn btn-primary" href="#" onclick="switchTab('plan');return false;">Plan Details</a><a class="btn btn-ghost" href="#" onclick="openReturnSchedule();return false;">Reschedule</a><a class="btn btn-ghost" href="#" onclick="openAddressModal();return false;">Edit Address</a></div></div></div></div>`; }
     case 9: return `<div class="empty-state"><div class="empty-state-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div><div class="empty-state-title">Your Roomo plan has ended.</div><div class="empty-state-body">Thank you for living with Roomo. You can review your past orders or start a new plan anytime.</div><a class="btn btn-primary" href="https://www.roomonyc.com/living-detail-page" target="_blank">Start a New Plan</a></div><div class="cards-grid" style="margin-top:var(--space-lg)"><div class="card animate-in"><div class="card-header"><span class="card-title">Past Plan</span><span class="card-badge badge-completed">Completed</span></div><div class="card-row"><span class="card-row-label">Room Set</span><span class="card-row-value">${setLabel(CONFIRMED_PLAN.setId)} Set · ${colorDisplayName(CONFIRMED_PLAN.colorSlug)}</span></div><div class="card-row"><span class="card-row-label">Lease Start</span><span class="card-row-value">${BACKEND.lease.startDateFull}</span></div><div class="card-row"><span class="card-row-label">Lease End</span><span class="card-row-value">${BACKEND.lease.endDateFull}</span></div><div class="card-row"><span class="card-row-label">Total Paid</span><span class="card-row-value">${BACKEND.billing.totalPaid}</span></div><div class="card-actions"><a class="btn btn-ghost" href="#" onclick="downloadReceipts();return false;">Download Receipts</a></div></div>${supportCard()}</div>`;
+    case 10: return `<div class="empty-state"><div class="empty-state-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div><div class="empty-state-title">Your order has been cancelled.</div><div class="empty-state-body">Your $25 deposit has been refunded to your original payment method. Please allow 5–10 business days for the refund to appear on your statement.<br><br>Changed your mind? You can start a new order anytime.</div><a class="btn btn-primary" href="https://www.roomonyc.com/living-detail-page" target="_blank">Start a New Plan</a></div>`;
     default: return '';
   }
 }
@@ -1714,7 +1757,7 @@ function renderHero(s) {
       + `<a class="hero-cta" href="#" style="background:transparent;border:1px solid rgba(249,245,241,0.5);color:rgba(249,245,241,0.85)" onclick="switchTab('plan');return false;">${d.cta2}</a>`
       + `</div>`;
   } else if(s===3) {
-    ctaHtml = `<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><a class="hero-cta" href="#" onclick="openReschedule();return false;">${d.cta}</a><a class="hero-cta" href="#" style="background:transparent;border:1px solid rgba(249,245,241,0.5);color:rgba(249,245,241,0.85)" onclick="openAddressModal();return false;">Change Address</a></div>`;
+    ctaHtml = `<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><a class="hero-cta" href="#" onclick="openReschedule();return false;">${d.cta}</a><a class="hero-cta" href="#" style="background:transparent;border:1px solid rgba(249,245,241,0.5);color:rgba(249,245,241,0.85)" onclick="openAddressModal();return false;">Change Address</a></div><div style="margin-top:12px"><a href="#" onclick="openCancelModal();return false;" style="font-size:12px;color:rgba(249,245,241,0.45);text-decoration:underline;font-family:var(--font-body)">Cancel order</a></div>`;
   } else if(s===4) {
     ctaHtml = `<a class="hero-cta" href="#" onclick="openConfirmDeliveryModal();return false;">${d.cta}</a>`;
   } else if(s===6) {
@@ -1727,7 +1770,7 @@ function renderHero(s) {
     ctaHtml = `<a class="hero-cta" href="#" onclick="openCheckoutModal();return false;">${d.cta}</a>`;
   } else if(s===1) {
     ctaHtml = `<a class="hero-cta" href="https://www.roomonyc.com/living-detail-page">${d.cta}</a>`;
-  } else if(s===9) {
+  } else if(s===9 || s===10) {
     ctaHtml = `<a class="hero-cta" href="https://www.roomonyc.com/living-detail-page" target="_blank" rel="noopener noreferrer">${d.cta}</a>`;
   } else {
     ctaHtml = `<a class="hero-cta" href="#">${d.cta}</a>`;
@@ -2253,6 +2296,45 @@ function saveTermEdit() {
   demoPlan.months    = selectedTermMonths;
   closeEditTermModal();
   redrawDraftOverview();
+}
+
+// Cancel order modal
+
+function openCancelModal() {
+  document.getElementById('cancelStep1').style.display='block';
+  document.getElementById('cancelStep2').style.display='none';
+  document.getElementById('cancelError').style.display='none';
+  document.getElementById('confirmCancelBtn').style.opacity='1';
+  document.getElementById('confirmCancelBtn').style.pointerEvents='auto';
+  document.getElementById('confirmCancelBtn').textContent='Yes, cancel order';
+  document.getElementById('cancelModal').classList.add('open');
+}
+function closeCancelModal() { document.getElementById('cancelModal').classList.remove('open'); }
+document.getElementById('cancelModal').addEventListener('click', function(e){ if(e.target===this) closeCancelModal(); });
+
+async function confirmCancelOrder() {
+  const btn = document.getElementById('confirmCancelBtn');
+  btn.style.opacity='0.5';
+  btn.style.pointerEvents='none';
+  btn.textContent='Cancelling...';
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const base = window.location.origin;
+    const resp = await fetch(base + '/api/cancel-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: token })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || 'Cancellation failed');
+    document.getElementById('cancelStep1').style.display='none';
+    document.getElementById('cancelStep2').style.display='block';
+  } catch(err) {
+    document.getElementById('cancelStep1').style.display='none';
+    document.getElementById('cancelErrorMsg').textContent = err.message || 'Please try again or contact support@roomonyc.com.';
+    document.getElementById('cancelError').style.display='block';
+  }
 }
 
 // Address modal

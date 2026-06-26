@@ -110,6 +110,11 @@ function deriveStep(customer, order) {
     return { step: 9, label: "Plan completed" };
   }
 
+  // ⑩ Cancelled
+  if (s === "cancelled") {
+    return { step: 10, label: "Order cancelled", meta: { cancelled: true } };
+  }
+
   // Fallback for refunded or unknown
   if (s === "refunded") {
     return { step: 9, label: "Plan completed", meta: { refunded: true } };
@@ -177,7 +182,8 @@ export default async function handler(req, res) {
       auth_failed: 8,
       completed: 9,
       failed: 10,
-      refunded: 11,
+      cancelled: 11,
+      refunded: 12,
     };
 
     const sorted = (orders || []).sort(

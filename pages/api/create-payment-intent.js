@@ -44,6 +44,21 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Missing required customer/address fields" });
     }
 
+    // Validate delivery date: must be at least 3 days from now, not a Sunday
+    if (deliveryDate) {
+      const delivery = new Date(deliveryDate + "T12:00:00");
+      const minDate = new Date();
+      minDate.setHours(0, 0, 0, 0);
+      minDate.setDate(minDate.getDate() + 3);
+      if (minDate.getDay() === 0) minDate.setDate(minDate.getDate() + 1);
+      if (delivery < minDate) {
+        return res.status(400).json({ error: "Delivery date must be at least 3 days from today" });
+      }
+      if (delivery.getDay() === 0) {
+        return res.status(400).json({ error: "Sunday delivery is not available" });
+      }
+    }
+
     // Stage 1 charge: $25 deposit only. Delivery fee is recorded but charged at stage 2.
     const depositCents = DEPOSIT_CENTS;
     const deliveryFeeCents = Math.max(0, Math.round(Number(deliveryFee) || 0)) * 100;

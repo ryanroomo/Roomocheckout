@@ -1100,10 +1100,21 @@ function hashDate(dateStr: string, period: string): number {
     return Math.abs(h)
 }
 
+// Compute the earliest selectable date: today + 3 natural days, skip Sundays
+function getEarliestDeliveryDate(): Date {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    d.setDate(d.getDate() + 3)
+    // If it lands on Sunday, push to Monday
+    if (d.getDay() === 0) d.setDate(d.getDate() + 1)
+    return d
+}
+
 // Pre-compute exactly 9 "booked" slots across all available dates
 function computeBookedSlots(): Set<string> {
-    const startDate = new Date(2026, 5, 26) // June 26
-    const endDate = new Date(2026, 9, 31) // October 31
+    const startDate = getEarliestDeliveryDate()
+    const endDate = new Date(startDate)
+    endDate.setMonth(endDate.getMonth() + 4) // ~4 months out
     const allSlots: { key: string; hash: number }[] = []
     const d = new Date(startDate)
     while (d <= endDate) {
@@ -1134,8 +1145,9 @@ function StepDate({
     const [selectedDate, setSelectedDate] = useState<string | null>(null)
     const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
     const [showSlotPicker, setShowSlotPicker] = useState(false)
-    const [viewMonth, setViewMonth] = useState(5)
-    const [viewYear, setViewYear] = useState(2026)
+    const earliest = getEarliestDeliveryDate()
+    const [viewMonth, setViewMonth] = useState(earliest.getMonth())
+    const [viewYear, setViewYear] = useState(earliest.getFullYear())
     const [realBooked, setRealBooked] = useState<Set<string>>(new Set())
 
     // Fetch real booked slots from Supabase via the Next.js API
@@ -1165,12 +1177,12 @@ function StepDate({
     const dayNames = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
     const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate()
     const firstDayOfWeek = new Date(viewYear, viewMonth, 1).getDay()
-    const startDate = new Date(2026, 5, 26)
+    const startDate = getEarliestDeliveryDate()
 
     const isSelectable = (day: number) => {
         const d = new Date(viewYear, viewMonth, day)
         if (d < startDate) return false
-        return d.getDay() !== 0
+        return d.getDay() !== 0 // skip Sundays
     }
 
     const isBooked = (dateStr: string, period: string) => {
@@ -1201,7 +1213,7 @@ function StepDate({
         setShowSlotPicker(true)
     }
 
-    const canPrev = !(viewYear === 2026 && viewMonth === 5)
+    const canPrev = !(viewYear === earliest.getFullYear() && viewMonth === earliest.getMonth())
 
     return (
         <div>
