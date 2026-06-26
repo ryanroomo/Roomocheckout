@@ -9,7 +9,7 @@ const BORDER = "#49372A"
 const MUTED = "#A09484"
 const FONT = "'Manrope', 'League Spartan', sans-serif"
 
-const API_URL = "https://www.roomonyc.com/api/newsletter-subscribe"
+const API_URL = "https://roomocheckout.vercel.app/api/newsletter-subscribe"
 
 type Status = "idle" | "sending" | "success" | "error"
 
@@ -57,6 +57,7 @@ export default function RoomoNewsletter(props: {
             if (!res.ok) throw new Error("fail")
             setStatus("success")
             trackEvent("newsletter_signup", { source: "footer" })
+            try { localStorage.setItem("roomo-nl-subscribed", "1") } catch (e) {}
         } catch {
             setStatus("error")
             setTimeout(() => setStatus("idle"), 2500)
@@ -80,12 +81,13 @@ export default function RoomoNewsletter(props: {
             style={{
                 width: "100%",
                 maxWidth: 380,
-                height: 52,
+                minWidth: 0,
+                height: 48,
                 borderRadius: 999,
                 border: `1.5px solid ${BORDER}`,
                 display: "flex",
                 alignItems: "center",
-                padding: "0 6px 0 24px",
+                padding: "0 6px 0 16px",
                 cursor: isSuccess ? "default" : "text",
                 overflow: "hidden",
                 position: "relative",
@@ -106,13 +108,15 @@ export default function RoomoNewsletter(props: {
                         transition={{ duration: 0.35 }}
                         style={{
                             fontFamily: FONT,
-                            fontSize: 14,
+                            fontSize: 13,
                             fontWeight: 600,
                             color: "#fff",
                             letterSpacing: "0.02em",
                             width: "100%",
                             textAlign: "center",
                             whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
                         }}
                     >
                         {successText}
@@ -137,9 +141,9 @@ export default function RoomoNewsletter(props: {
                                     transition={{ duration: 0.2 }}
                                     style={{
                                         position: "absolute",
-                                        left: 24,
+                                        left: 16,
                                         fontFamily: FONT,
-                                        fontSize: 14,
+                                        fontSize: 13,
                                         fontWeight: 500,
                                         color: BROWN,
                                         letterSpacing: "0.03em",
@@ -168,7 +172,7 @@ export default function RoomoNewsletter(props: {
                                 outline: "none",
                                 background: "transparent",
                                 fontFamily: FONT,
-                                fontSize: 14,
+                                fontSize: 13,
                                 fontWeight: 500,
                                 color: BROWN,
                                 letterSpacing: "0.02em",
@@ -194,8 +198,8 @@ export default function RoomoNewsletter(props: {
                             }}
                             transition={{ duration: 0.25 }}
                             style={{
-                                width: 40,
-                                height: 40,
+                                width: 36,
+                                height: 36,
                                 borderRadius: 999,
                                 border: "none",
                                 display: "flex",

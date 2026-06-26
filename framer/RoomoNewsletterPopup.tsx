@@ -8,9 +8,10 @@ const CREAM = "#FAF6F1"
 const MUTED = "#A09484"
 const BORDER = "#E8E0D6"
 const FONT = "'Manrope', 'League Spartan', sans-serif"
-const STORAGE_KEY = "roomo-newsletter-dismissed"
+const POPUP_CLOSED_KEY = "roomo-nl-popup-closed"
+const SUBSCRIBED_KEY = "roomo-nl-subscribed"
 
-const API_URL = "https://www.roomonyc.com/api/newsletter-subscribe"
+const API_URL = "https://roomocheckout.vercel.app/api/newsletter-subscribe"
 
 type Status = "idle" | "sending" | "success" | "error"
 
@@ -55,7 +56,7 @@ export default function RoomoNewsletterPopup(props: {
     useEffect(() => {
         // Don't show if already dismissed / subscribed
         try {
-            if (localStorage.getItem(STORAGE_KEY)) return
+            if (localStorage.getItem(SUBSCRIBED_KEY) || localStorage.getItem(POPUP_CLOSED_KEY)) return
         } catch {}
 
         timerRef.current = setTimeout(() => {
@@ -69,7 +70,7 @@ export default function RoomoNewsletterPopup(props: {
     const dismiss = () => {
         setVisible(false)
         try {
-            localStorage.setItem(STORAGE_KEY, "1")
+            localStorage.setItem(POPUP_CLOSED_KEY, "1")
         } catch {}
     }
 
@@ -92,7 +93,7 @@ export default function RoomoNewsletterPopup(props: {
             setStatus("success")
             trackEvent("newsletter_signup", { source: "popup" })
             try {
-                localStorage.setItem(STORAGE_KEY, "1")
+                localStorage.setItem(SUBSCRIBED_KEY, "1")
             } catch {}
             // Auto-close after 2.5s
             setTimeout(() => setVisible(false), 2500)
@@ -366,7 +367,7 @@ export default function RoomoNewsletterPopup(props: {
                                                 background:
                                                     status === "error"
                                                         ? "#C44B4B"
-                                                        : "#B8D4E3",
+                                                        : "#D4C4B0",
                                                 color:
                                                     status === "error"
                                                         ? "#fff"

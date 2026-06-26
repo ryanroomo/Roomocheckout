@@ -1171,11 +1171,11 @@ function normalizeColorSlug(raw) {
   if (!raw) return 'hudson-haze';
   var s = raw.toLowerCase().trim();
   var aliasMap = {
-    'moss': 'central-moss', 'central moss': 'central-moss',
-    'haze': 'hudson-haze', 'hudson haze': 'hudson-haze',
-    'merlot': 'soho-merlot', 'soho merlot': 'soho-merlot',
-    'almond': 'almond-breeze', 'almond breeze': 'almond-breeze',
-    'carbon': 'carbon-black', 'carbon black': 'carbon-black',
+    'moss': 'central-moss', 'central moss': 'central-moss', 'central': 'central-moss',
+    'haze': 'hudson-haze', 'hudson haze': 'hudson-haze', 'hudson': 'hudson-haze',
+    'merlot': 'soho-merlot', 'soho merlot': 'soho-merlot', 'soho': 'soho-merlot',
+    'almond': 'almond-breeze', 'almond breeze': 'almond-breeze', 'breeze': 'almond-breeze',
+    'carbon': 'carbon-black', 'carbon black': 'carbon-black', 'black': 'carbon-black',
     'color theory': 'color-theory', 'theory': 'color-theory'
   };
   return aliasMap[s] || s;

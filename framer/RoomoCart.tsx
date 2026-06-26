@@ -402,16 +402,59 @@ function StepCart({
     onRemove,
     onContinueShopping,
     onCheckout,
+    checkoutBaseUrl,
+    couponState,
+    onCouponChange,
 }: {
     cart: CartItem[]
     onRemove: (id: string) => void
     onContinueShopping: () => void
     onCheckout: () => void
+    checkoutBaseUrl: string
+    couponState: { code: string; status: string; discountType: string; discountValue: number; discountAmount: number; appliesTo: string; description: string }
+    onCouponChange: (state: any) => void
 }) {
     const rentItems = cart.filter((i) => i.mode === "rent")
     const buyItems = cart.filter((i) => i.mode === "buy-new")
     const totalMonthly = rentItems.reduce((sum, i) => sum + i.price, 0)
     const totalBuy = buyItems.reduce((sum, i) => sum + i.price, 0)
+    const [couponInput, setCouponInput] = useState(couponState.code || "")
+
+    const handleApplyCoupon = async () => {
+        const trimmed = couponInput.trim()
+        if (!trimmed) return
+        onCouponChange({ ...couponState, status: "checking" })
+        try {
+            const base = (checkoutBaseUrl || "https://roomocheckout.vercel.app").replace(/\/$/, "")
+            const res = await fetch(`${base}/api/validate-coupon`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ code: trimmed, cartTotal: totalMonthly }),
+            })
+            const data = await res.json()
+            if (data.valid) {
+                onCouponChange({
+                    code: data.code,
+                    status: "valid",
+                    discountType: data.discountType,
+                    discountValue: data.discountValue,
+                    discountAmount: data.discountAmount,
+                    appliesTo: data.appliesTo,
+                    description: data.description,
+                })
+                trackEvent("coupon_applied", { code: data.code, discount: data.discountAmount })
+            } else {
+                onCouponChange({ code: trimmed, status: "invalid", discountType: "", discountValue: 0, discountAmount: 0, appliesTo: "", description: data.reason || "Invalid code" })
+            }
+        } catch (e) {
+            onCouponChange({ code: trimmed, status: "error", discountType: "", discountValue: 0, discountAmount: 0, appliesTo: "", description: "Something went wrong" })
+        }
+    }
+
+    const handleRemoveCoupon = () => {
+        setCouponInput("")
+        onCouponChange({ code: "", status: "idle", discountType: "", discountValue: 0, discountAmount: 0, appliesTo: "", description: "" })
+    }
 
     if (cart.length === 0) {
         return (
@@ -513,6 +556,87 @@ function StepCart({
                     {totalBuy > 0 && (
                         <span>One-time ${totalBuy.toLocaleString()}</span>
                     )}
+                </div>
+            )}
+
+            {/* Coupon Code */}
+            <div style={{ marginBottom: 12 }}>
+                {couponState.status === "valid" ? (
+                    <div style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "10px 14px", background: C.greenLight, borderRadius: 10,
+                    }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span style={{ fontSize: 14 }}>✓</span>
+                            <span style={{ fontFamily: font, fontSize: 12, fontWeight: 600, color: C.green }}>
+                                {couponState.code}
+                            </span>
+                            <span style={{ fontFamily: font, fontSize: 11, color: C.brownMuted }}>
+                                {couponState.discountType === "percentage"
+                                    ? `${couponState.discountValue}% off`
+                                    : `$${couponState.discountValue} off`}
+                                {couponState.appliesTo === "first_month" ? " first month" : ""}
+                            </span>
+                        </div>
+                        <button onClick={handleRemoveCoupon} style={{
+                            background: "none", border: "none", fontFamily: font, fontSize: 11,
+                            color: C.muted, cursor: "pointer", textDecoration: "underline", padding: 0,
+                        }}>Remove</button>
+                    </div>
+                ) : (
+                    <div>
+                        <div style={{ display: "flex", gap: 8 }}>
+                            <input
+                                value={couponInput}
+                                onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); if (couponState.status === "invalid" || couponState.status === "error") onCouponChange({ ...couponState, status: "idle" }) }}
+                                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleApplyCoupon() } }}
+                                placeholder="Coupon code"
+                                style={{
+                                    flex: 1, padding: "9px 12px", borderRadius: 10,
+                                    border: `1.5px solid ${couponState.status === "invalid" ? C.red : C.border}`,
+                                    fontFamily: font, fontSize: 13, color: C.brown, outline: "none",
+                                    background: "#fff", boxSizing: "border-box" as const,
+                                    letterSpacing: "0.05em", fontWeight: 600,
+                                }}
+                            />
+                            <button
+                                onClick={handleApplyCoupon}
+                                disabled={!couponInput.trim() || couponState.status === "checking"}
+                                style={{
+                                    padding: "9px 16px", borderRadius: 10, border: "none",
+                                    background: couponInput.trim() ? C.brown : C.muted, color: "#fff",
+                                    fontFamily: font, fontSize: 12, fontWeight: 600,
+                                    cursor: couponInput.trim() ? "pointer" : "not-allowed",
+                                    whiteSpace: "nowrap" as const, flexShrink: 0,
+                                    opacity: couponState.status === "checking" ? 0.7 : 1,
+                                }}
+                            >
+                                {couponState.status === "checking" ? "..." : "Apply"}
+                            </button>
+                        </div>
+                        {couponState.status === "invalid" && (
+                            <div style={{ fontFamily: font, fontSize: 11, color: C.red, marginTop: 4, paddingLeft: 2 }}>
+                                {couponState.description || "Invalid coupon code"}
+                            </div>
+                        )}
+                        {couponState.status === "error" && (
+                            <div style={{ fontFamily: font, fontSize: 11, color: C.red, marginTop: 4, paddingLeft: 2 }}>
+                                Something went wrong, try again
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* Discount line (only when coupon is valid and there are rent items) */}
+            {couponState.status === "valid" && couponState.discountAmount > 0 && totalMonthly > 0 && (
+                <div style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    fontFamily: font, fontSize: 12, color: C.green, fontWeight: 600,
+                    marginBottom: 8, padding: "0 4px",
+                }}>
+                    <span>Discount ({couponState.code})</span>
+                    <span>-${couponState.discountAmount}/mo</span>
                 </div>
             )}
 
@@ -1617,6 +1741,7 @@ function StepPayment({
     deliveryFee,
     deliveryDate,
     deliverySlot,
+    couponCode,
     onSuccess,
 }: {
     onBack: () => void
@@ -1626,6 +1751,7 @@ function StepPayment({
     deliveryFee: number
     deliveryDate: string
     deliverySlot: string
+    couponCode: string
     onSuccess: () => void
 }) {
     const total = cart.reduce((s, i) => s + i.price, 0)
@@ -1651,6 +1777,7 @@ function StepPayment({
         deliveryFee: String(deliveryFee),
         deliveryDate: deliveryDate || "",
         deliverySlot: deliverySlot || "",
+        couponCode: couponCode || "",
     })
     const iframeSrc = checkoutBaseUrl
         ? `${checkoutBaseUrl}?${params.toString()}`
@@ -1813,103 +1940,124 @@ function StepPayment({
 
 // ─── Shared Floating Panel ──────────────────────────────────────
 
-const NEWSLETTER_DISMISSED_KEY = "roomo-newsletter-dismissed"
-const NEWSLETTER_API = "https://www.roomonyc.com/api/newsletter-subscribe"
-
-function isNewsletterDismissed() {
-    try { return localStorage.getItem(NEWSLETTER_DISMISSED_KEY) === "1" } catch { return false }
-}
-function markNewsletterDismissed() {
-    try { localStorage.setItem(NEWSLETTER_DISMISSED_KEY, "1") } catch {}
+function _nlSubscribed(): boolean {
+    try {
+        return localStorage.getItem("roomo-nl-subscribed") === "1"
+    } catch (e) {
+        return false
+    }
 }
 
-function ExitNewsletter({ onClose, isMobile }: { onClose: () => void; isMobile: boolean }) {
+function _nlCartSkipped(): boolean {
+    try {
+        return localStorage.getItem("roomo-nl-cart-closed") === "1"
+    } catch (e) {
+        return false
+    }
+}
+
+function _nlMarkSubscribed(): void {
+    try {
+        localStorage.setItem("roomo-nl-subscribed", "1")
+    } catch (e) {
+        /* noop */
+    }
+}
+
+function _nlMarkCartSkipped(): void {
+    try {
+        localStorage.setItem("roomo-nl-cart-closed", "1")
+    } catch (e) {
+        /* noop */
+    }
+}
+
+function ExitNewsletter(props: { onClose: () => void; isMobile: boolean }) {
     const [email, setEmail] = useState("")
-    const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle")
+    const [nlStatus, setNlStatus] = useState("idle")
 
-    const handleSubmit = async () => {
+    const doSubmit = () => {
         const trimmed = email.trim()
-        if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return
-        setStatus("sending")
-        try {
-            const res = await fetch(NEWSLETTER_API, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: trimmed }),
+        if (!trimmed || trimmed.indexOf("@") < 1) return
+        setNlStatus("sending")
+        fetch("https://roomocheckout.vercel.app/api/newsletter-subscribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: trimmed }),
+        })
+            .then((res) => {
+                if (!res.ok) throw new Error("fail")
+                setNlStatus("success")
+                _nlMarkSubscribed()
+                trackEvent("newsletter_signup", { source: "cart_exit" })
+                setTimeout(props.onClose, 2000)
             })
-            if (!res.ok) throw new Error("fail")
-            setStatus("success")
-            markNewsletterDismissed()
-            trackEvent("newsletter_signup", { source: "cart_exit" })
-            setTimeout(onClose, 2000)
-        } catch {
-            setStatus("error")
-            setTimeout(() => setStatus("idle"), 2500)
-        }
+            .catch(() => {
+                setNlStatus("error")
+                setTimeout(() => setNlStatus("idle"), 2500)
+            })
     }
 
-    const handleSkip = () => {
-        markNewsletterDismissed()
-        onClose()
+    const doSkip = () => {
+        _nlMarkCartSkipped()
+        props.onClose()
+    }
+
+    if (nlStatus === "success") {
+        return (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, padding: "20px 0", textAlign: "center", gap: 12 }}>
+                <div style={{ fontSize: 40, lineHeight: 1 }}>{"✓"}</div>
+                <span style={{ fontFamily: font, fontSize: 18, fontWeight: 700, color: C.brown }}>{"You're in! Check your inbox."}</span>
+            </div>
+        )
     }
 
     return (
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, padding: "20px 0", textAlign: "center", gap: 20 }}>
-            {status === "success" ? (
-                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-                    <div style={{ fontSize: 40, lineHeight: 1 }}>✓</div>
-                    <span style={{ fontFamily: font, fontSize: 18, fontWeight: 700, color: C.brown }}>You're in! Check your inbox.</span>
-                </motion.div>
-            ) : (
-                <>
-                    <div style={{ fontFamily: font, fontSize: isMobile ? 20 : 22, fontWeight: 700, color: C.brown, lineHeight: 1.3 }}>
-                        Not ready yet?
-                    </div>
-                    <div style={{ fontFamily: font, fontSize: 32, fontWeight: 800, color: C.brown, letterSpacing: "-0.02em", lineHeight: 1 }}>
-                        10% OFF
-                    </div>
-                    <div style={{ fontFamily: font, fontSize: 13, color: C.muted, lineHeight: 1.5, maxWidth: 280 }}>
-                        Join our newsletter and enjoy 10% off your first month. You can always come back later.
-                    </div>
-                    <input
-                        type="email"
-                        placeholder="Email Address"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleSubmit() } }}
-                        style={{
-                            width: "100%", maxWidth: 300, height: 48, borderRadius: 8,
-                            border: `1.5px solid ${C.border}`, background: "#fff",
-                            padding: "0 16px", fontFamily: font, fontSize: 14, color: C.brown,
-                            outline: "none", boxSizing: "border-box",
-                        }}
-                    />
-                    <motion.button
-                        onClick={handleSubmit}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.97 }}
-                        style={{
-                            width: "100%", maxWidth: 300, height: 48, borderRadius: 999,
-                            border: "none", background: status === "error" ? "#C44B4B" : C.brown,
-                            color: "#fff", fontFamily: font, fontSize: 14, fontWeight: 700,
-                            letterSpacing: "0.05em", cursor: status === "sending" ? "wait" : "pointer",
-                            opacity: status === "sending" ? 0.7 : 1,
-                        }}
-                    >
-                        {status === "sending" ? "..." : status === "error" ? "Oops, try again" : "GET 10% OFF"}
-                    </motion.button>
-                    <button
-                        onClick={handleSkip}
-                        style={{
-                            background: "none", border: "none", fontFamily: font, fontSize: 13,
-                            color: C.muted, cursor: "pointer", textDecoration: "underline",
-                            padding: 4,
-                        }}
-                    >
-                        No thanks
-                    </button>
-                </>
-            )}
+            <div style={{ fontFamily: font, fontSize: props.isMobile ? 20 : 22, fontWeight: 700, color: C.brown, lineHeight: 1.3 }}>
+                {"Not ready yet?"}
+            </div>
+            <div style={{ fontFamily: font, fontSize: 32, fontWeight: 800, color: C.brown, letterSpacing: "-0.02em", lineHeight: 1 }}>
+                {"10% OFF"}
+            </div>
+            <div style={{ fontFamily: font, fontSize: 13, color: C.muted, lineHeight: 1.5, maxWidth: 280 }}>
+                {"Join our newsletter and enjoy 10% off your first month. You can always come back later."}
+            </div>
+            <input
+                type="email"
+                placeholder="Email Address"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); doSubmit() } }}
+                style={{
+                    width: "100%", maxWidth: 300, height: 48, borderRadius: 8,
+                    border: "1.5px solid " + C.border, background: "#fff",
+                    padding: "0 16px", fontFamily: font, fontSize: 14, color: C.brown,
+                    outline: "none", boxSizing: "border-box" as const,
+                }}
+            />
+            <button
+                onClick={doSubmit}
+                style={{
+                    width: "100%", maxWidth: 300, height: 48, borderRadius: 999,
+                    border: "none", background: nlStatus === "error" ? "#C44B4B" : C.brown,
+                    color: "#fff", fontFamily: font, fontSize: 14, fontWeight: 700,
+                    letterSpacing: "0.05em", cursor: nlStatus === "sending" ? "wait" : "pointer",
+                    opacity: nlStatus === "sending" ? 0.7 : 1,
+                }}
+            >
+                {nlStatus === "sending" ? "..." : nlStatus === "error" ? "Oops, try again" : "GET 10% OFF"}
+            </button>
+            <button
+                onClick={doSkip}
+                style={{
+                    background: "none", border: "none", fontFamily: font, fontSize: 13,
+                    color: C.muted, cursor: "pointer", textDecoration: "underline",
+                    padding: 4,
+                }}
+            >
+                {"No thanks"}
+            </button>
         </div>
     )
 }
@@ -1925,6 +2073,8 @@ function CartPanel({ checkoutBaseUrl }: { checkoutBaseUrl: string }) {
     const [deliverySlot, setDeliverySlot] = useState("")
     const [showExitNL, setShowExitNL] = useState(false)
     const checkoutDoneRef = useRef(false)
+    const emptyCoupon = { code: "", status: "idle", discountType: "", discountValue: 0, discountAmount: 0, appliesTo: "", description: "" }
+    const [couponState, setCouponState] = useState(emptyCoupon)
 
     // Prevent duplicate panels — only the first mounted instance renders
     const idRef = useRef(Math.random())
@@ -1945,11 +2095,12 @@ function CartPanel({ checkoutBaseUrl }: { checkoutBaseUrl: string }) {
             setStep(0)
             setShowExitNL(false)
             checkoutDoneRef.current = false
+            setCouponState(emptyCoupon)
         }
     }, [open])
 
     const handleClose = () => {
-        if (!checkoutDoneRef.current && !isNewsletterDismissed() && !showExitNL) {
+        if (!checkoutDoneRef.current && !_nlSubscribed() && !_nlCartSkipped() && !showExitNL) {
             setShowExitNL(true)
             trackEvent("cart_exit_newsletter_shown")
             return
@@ -2072,6 +2223,9 @@ function CartPanel({ checkoutBaseUrl }: { checkoutBaseUrl: string }) {
                                         onRemove={(id) => removeFromCart(id)}
                                         onContinueShopping={handleClose}
                                         onCheckout={() => setStep(1)}
+                                        checkoutBaseUrl={checkoutBaseUrl}
+                                        couponState={couponState}
+                                        onCouponChange={setCouponState}
                                     />
                                 )}
                                 {step === 1 && (
@@ -2114,12 +2268,10 @@ function CartPanel({ checkoutBaseUrl }: { checkoutBaseUrl: string }) {
                                         deliveryFee={deliveryFee}
                                         deliveryDate={deliveryDate}
                                         deliverySlot={deliverySlot}
+                                        couponCode={couponState.status === "valid" ? couponState.code : ""}
                                         onSuccess={() => {
                                             checkoutDoneRef.current = true
-                                            setTimeout(() => {
-                                                setCart([])
-                                                setCartOpen(false)
-                                            }, 3000)
+                                            setCart([])
                                         }}
                                     />
                                 )}
@@ -2182,7 +2334,7 @@ function getGalleryImage(): string {
             }
         })
         return best
-    } catch {
+    } catch (e) {
         return ""
     }
 }
