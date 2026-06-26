@@ -1100,13 +1100,15 @@ function hashDate(dateStr: string, period: string): number {
     return Math.abs(h)
 }
 
-// Compute the earliest selectable date: today + 3 natural days, skip Sundays
+// Compute the earliest selectable date: today + 3 days, skipping Sundays in the count
 function getEarliestDeliveryDate(): Date {
     const d = new Date()
     d.setHours(0, 0, 0, 0)
-    d.setDate(d.getDate() + 3)
-    // If it lands on Sunday, push to Monday
-    if (d.getDay() === 0) d.setDate(d.getDate() + 1)
+    let count = 0
+    while (count < 3) {
+        d.setDate(d.getDate() + 1)
+        if (d.getDay() !== 0) count++ // Sundays don't count toward the 3 days
+    }
     return d
 }
 
@@ -1118,12 +1120,9 @@ function computeBookedSlots(): Set<string> {
     const allSlots: { key: string; hash: number }[] = []
     const d = new Date(startDate)
     while (d <= endDate) {
-        if (d.getDay() !== 0) {
-            // skip sunday
-            const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-            allSlots.push({ key: `${ds}-am`, hash: hashDate(ds, "am") })
-            allSlots.push({ key: `${ds}-pm`, hash: hashDate(ds, "pm") })
-        }
+        const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+        allSlots.push({ key: `${ds}-am`, hash: hashDate(ds, "am") })
+        allSlots.push({ key: `${ds}-pm`, hash: hashDate(ds, "pm") })
         d.setDate(d.getDate() + 1)
     }
     // Sort by hash deterministically, pick exactly 9
@@ -1181,8 +1180,7 @@ function StepDate({
 
     const isSelectable = (day: number) => {
         const d = new Date(viewYear, viewMonth, day)
-        if (d < startDate) return false
-        return d.getDay() !== 0 // skip Sundays
+        return d >= startDate
     }
 
     const isBooked = (dateStr: string, period: string) => {

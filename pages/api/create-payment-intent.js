@@ -44,18 +44,18 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Missing required customer/address fields" });
     }
 
-    // Validate delivery date: must be at least 3 days from now, not a Sunday
+    // Validate delivery date: must be at least 3 non-Sunday days from now
     if (deliveryDate) {
       const delivery = new Date(deliveryDate + "T12:00:00");
       const minDate = new Date();
       minDate.setHours(0, 0, 0, 0);
-      minDate.setDate(minDate.getDate() + 3);
-      if (minDate.getDay() === 0) minDate.setDate(minDate.getDate() + 1);
+      let count = 0;
+      while (count < 3) {
+        minDate.setDate(minDate.getDate() + 1);
+        if (minDate.getDay() !== 0) count++;
+      }
       if (delivery < minDate) {
         return res.status(400).json({ error: "Delivery date must be at least 3 days from today" });
-      }
-      if (delivery.getDay() === 0) {
-        return res.status(400).json({ error: "Sunday delivery is not available" });
       }
     }
 

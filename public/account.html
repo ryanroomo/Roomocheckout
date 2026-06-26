@@ -1098,6 +1098,30 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
   </div>
 </div>
 
+<!-- End Term Early Modal -->
+<div class="modal-overlay" id="endTermEarlyModal">
+  <div class="modal" style="max-width:440px">
+    <div id="endTermEarlyStep1">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:var(--space-md)">
+        <div style="width:36px;height:36px;border-radius:50%;background:rgba(180,60,40,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a03020" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <div style="font-family:var(--font-heading);font-weight:700;font-size:20px;color:var(--text-primary)">End your term early?</div>
+      </div>
+      <p style="font-size:14px;color:#816E68;margin-bottom:var(--space-md);line-height:1.6">
+        Early termination is <strong style="color:var(--text-primary)">non-refundable</strong>. Remaining payments through your current term end date will still apply, and your furniture will be picked up on the scheduled return date.
+      </p>
+      <p style="font-size:13px;color:#816E68;margin-bottom:var(--space-lg);line-height:1.6">
+        If you have special circumstances, please contact us at <a href="mailto:hello@roomonyc.com" style="color:var(--text-primary);font-weight:600">hello@roomonyc.com</a> before proceeding — we'll do our best to help.
+      </p>
+      <div class="modal-actions">
+        <a class="btn btn-ghost" href="#" onclick="closeEndTermEarlyModal();return false;">Keep my plan</a>
+        <a class="btn btn-primary" href="#" style="background:#a03020;border-color:#a03020" onclick="closeEndTermEarlyModal();openReturnSchedule();return false;">Schedule Return Pickup</a>
+      </div>
+    </div>
+  </div>
+</div>
+
 <footer class="footer">
   <div class="footer-top">
     <a href="https://www.roomonyc.com" target="_blank" class="footer-logo">ROOMO</a>
@@ -1584,7 +1608,7 @@ function planCard(s, bc, bt, full=false) {
       <div style="border-top:1px solid var(--border-light);padding-top:var(--space-md)">
         <div class="card-row"><span class="card-row-label">Next Payment</span><span class="card-row-value">${BACKEND.billing.nextDueDateFull}</span></div>
       </div>
-      <div class="card-actions"><a class="btn btn-primary" href="#" onclick="switchTab('plan');return false;">View Details</a></div>
+      <div class="card-actions"><a class="btn btn-primary" href="#" onclick="switchTab('plan');return false;">View Details</a>${(s===5||s===7)?'<a class="btn btn-ghost" href="#" onclick="openEndTermEarlyModal();return false;">End Term Early</a>':''}</div>
     </div>
   </div>`;
 }
@@ -1669,18 +1693,19 @@ function paymentCard(f, full=false) {
   return `<div class="${cls}"><div class="card-header"><span class="card-title">Payment</span></div><div style="display:flex;align-items:flex-end;justify-content:space-between;padding:var(--space-md) 0 var(--space-sm);border-bottom:1px solid var(--border-light);margin-bottom:var(--space-md)"><div><div style="font-size:11px;font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Amount Due</div><div style="font-family:var(--font-body);font-weight:700;font-size:32px;color:var(--text-primary);line-height:1;letter-spacing:-1px">${_monthlyAmt}</div></div><div style="text-align:right;padding-bottom:4px"><div style="font-size:11px;font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Due Date</div><div style="font-family:var(--font-body);font-weight:700;font-size:20px;color:var(--text-primary);line-height:1">${BACKEND.billing.nextDueDateFull}</div></div></div><div class="card-row"><span class="card-row-label">Method</span><span class="card-row-value">${_pm2.brand} ending in ${_pm2.last4}</span></div><div class="card-actions"><a class="btn btn-primary" href="#" onclick="openMakePaymentModal();return false;">Make Payment</a><a class="btn btn-ghost" href="#" onclick="openPaymentModal();return false;">Update Payment Method</a></div></div>`;
 }
 function deliveryCard(s, full=false, details=false) {
+  var _cancelLink = s===3 ? '<div style="margin-top:8px;text-align:right"><a href="#" onclick="openCancelModal();return false;" style="font-size:12px;color:var(--text-muted);text-decoration:underline">Cancel order</a></div>' : '';
   if(s===3||s===4) {
     if(!details) {
       const _dd2=window._deliveryDate||{};
       const _dm2=(_dd2.dateMain||'June 12')+', '+(_dd2.year||'2026');
       const _ds2=_dd2.slot||'10:00 AM – 2:00 PM';
-      return `<div class="card ${full?'card-full':''} animate-in"><div class="card-header"><span class="card-title">Delivery Appointment</span><span class="card-badge badge-scheduled">${s===4?'Arriving Soon':'Scheduled'}</span></div><div style="padding-top:var(--space-sm)"><div style="font-family:var(--font-body);font-weight:700;font-size:26px;color:var(--text-primary);line-height:1.15;margin-bottom:6px">${_dm2}</div><div style="font-size:14px;color:var(--text-secondary);margin-bottom:var(--space-md)">${_ds2}</div><div class="card-row"><span class="card-row-label">Address</span><span class="card-row-value">${_addrLine1()}</span></div><div class="card-actions"><a class="btn btn-primary" href="#" onclick="openReschedule();return false;">Reschedule</a><a class="btn btn-ghost" href="#" onclick="openAddressModal();return false;">Change Address</a></div></div></div>`;
+      return `<div class="card ${full?'card-full':''} animate-in"><div class="card-header"><span class="card-title">Delivery Appointment</span><span class="card-badge badge-scheduled">${s===4?'Arriving Soon':'Scheduled'}</span></div><div style="padding-top:var(--space-sm)"><div style="font-family:var(--font-body);font-weight:700;font-size:26px;color:var(--text-primary);line-height:1.15;margin-bottom:6px">${_dm2}</div><div style="font-size:14px;color:var(--text-secondary);margin-bottom:var(--space-md)">${_ds2}</div><div class="card-row"><span class="card-row-label">Address</span><span class="card-row-value">${_addrLine1()}</span></div><div class="card-actions"><a class="btn btn-primary" href="#" onclick="openReschedule();return false;">Reschedule</a><a class="btn btn-ghost" href="#" onclick="openAddressModal();return false;">Change Address</a></div>${_cancelLink}</div></div>`;
     }
     const _dd=window._deliveryDate||{};
     const _dMain=_dd.dateMain||'June 12';
     const _dYear=_dd.year||'2026';
     const _dSlot=_dd.slot||'10:00 AM – 2:00 PM';
-    return `<div class="card card-delivery ${full?'card-full':''} animate-in"><div class="card-header"><span class="card-title">Delivery Appointment</span><span class="card-badge badge-scheduled">${s===4?'Arriving Soon':'Scheduled'}</span></div><div class="delivery-split"><div class="delivery-date-block"><div class="delivery-date-main">${_dMain}<br>${_dYear}</div><div class="delivery-time-main">${_dSlot}</div></div><div class="delivery-meta"><div class="card-row"><span class="card-row-label">Address</span><span class="card-row-value">${_addrLine1()}</span></div><div class="card-row"><span class="card-row-label">Access</span><span class="card-row-value">${_addrAccess()}</span></div><div class="card-actions"><a class="btn btn-primary" href="#" onclick="openReschedule();return false;">Reschedule</a><a class="btn btn-ghost" href="#" onclick="openAddressModal();return false;">Change Address</a></div></div></div></div>`;
+    return `<div class="card card-delivery ${full?'card-full':''} animate-in"><div class="card-header"><span class="card-title">Delivery Appointment</span><span class="card-badge badge-scheduled">${s===4?'Arriving Soon':'Scheduled'}</span></div><div class="delivery-split"><div class="delivery-date-block"><div class="delivery-date-main">${_dMain}<br>${_dYear}</div><div class="delivery-time-main">${_dSlot}</div></div><div class="delivery-meta"><div class="card-row"><span class="card-row-label">Address</span><span class="card-row-value">${_addrLine1()}</span></div><div class="card-row"><span class="card-row-label">Access</span><span class="card-row-value">${_addrAccess()}</span></div><div class="card-actions"><a class="btn btn-primary" href="#" onclick="openReschedule();return false;">Reschedule</a><a class="btn btn-ghost" href="#" onclick="openAddressModal();return false;">Change Address</a></div>${_cancelLink}</div></div></div>`;
   }
   return '';
 }
@@ -1755,7 +1780,8 @@ function renderHero(s) {
     ctaHtml = `<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">`
       + `<a class="hero-cta" href="#" onclick="openMakePaymentModal();return false;">${d.cta}</a>`
       + `<a class="hero-cta" href="#" style="background:transparent;border:1px solid rgba(249,245,241,0.5);color:rgba(249,245,241,0.85)" onclick="switchTab('plan');return false;">${d.cta2}</a>`
-      + `</div>`;
+      + `</div>`
+      + `<div style="margin-top:12px"><a href="#" onclick="openEndTermEarlyModal();return false;" style="font-size:12px;color:rgba(249,245,241,0.45);text-decoration:underline;font-family:var(--font-body)">End term early</a></div>`;
   } else if(s===3) {
     ctaHtml = `<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><a class="hero-cta" href="#" onclick="openReschedule();return false;">${d.cta}</a><a class="hero-cta" href="#" style="background:transparent;border:1px solid rgba(249,245,241,0.5);color:rgba(249,245,241,0.85)" onclick="openAddressModal();return false;">Change Address</a></div><div style="margin-top:12px"><a href="#" onclick="openCancelModal();return false;" style="font-size:12px;color:rgba(249,245,241,0.45);text-decoration:underline;font-family:var(--font-body)">Cancel order</a></div>`;
   } else if(s===4) {
@@ -2336,6 +2362,15 @@ async function confirmCancelOrder() {
     document.getElementById('cancelError').style.display='block';
   }
 }
+
+// End term early modal
+function openEndTermEarlyModal() {
+  document.getElementById('endTermEarlyModal').classList.add('open');
+}
+function closeEndTermEarlyModal() {
+  document.getElementById('endTermEarlyModal').classList.remove('open');
+}
+document.getElementById('endTermEarlyModal').addEventListener('click', function(e){ if(e.target===this) closeEndTermEarlyModal(); });
 
 // Address modal
 
