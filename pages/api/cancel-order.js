@@ -98,6 +98,15 @@ export default async function handler(req, res) {
       }
     }
 
+    // ── Release pre-auth hold if present ────────────────────
+    if (order.stripe_auth_pi_id) {
+      try {
+        await stripe.paymentIntents.cancel(order.stripe_auth_pi_id);
+      } catch (authErr) {
+        console.error("Cancel pre-auth error (non-fatal):", authErr.message);
+      }
+    }
+
     // ── Update order status ──────────────────────────────────
     const { error: updateErr } = await supabase
       .from("orders")

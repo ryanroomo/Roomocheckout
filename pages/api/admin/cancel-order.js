@@ -69,12 +69,33 @@ export default async function handler(req, res) {
       }
     }
 
+    // ── Release pre-auth hold if authorized ─────────────────
+    if (order.status === "authorized" && order.stripe_auth_pi_id) {
+      try {
+        await stripe.paymentIntents.cancel(order.stripe_auth_pi_id);
+      } catch (authErr) {
+        console.error("Cancel pre-auth error (non-fatal):", authErr.message);
+        // If already cancelled/captured, continue
+      }
+    }
+
+    // ── Cancel Stripe Subscription if active ─────────────────
+    if (order.stripe_subscription_id) {
+      try {
+        await stripe.subscriptions.cancel(order.stripe_subscription_id);
+      } catch (subErr) {
+        console.error("Cancel subscription error (non-fatal):", subErr.message);
+      }
+    }
+
     // ── Update order status ──────────────────────────────────
     const { error: updateErr } = await supabase
       .from("orders")
       .update({
         status: "cancelled",
         cancelled_at: new Date().toISOString(),
+        stripe_subscription_id: null,
+        subscription_ends_at: null,
       })
       .eq("id", order.id);
 
