@@ -67,8 +67,8 @@ function deriveStep(customer, order) {
     return { step: 4, label: "Delivery within 48h" };
   }
 
-  // ⑤ Active rental / owned
-  if (s === "active" || s === "delivered") {
+  // ⑤ Active rental / owned / balance charged
+  if (s === "active" || s === "delivered" || s === "balance_charged") {
     // "delivered" without a subscription = purchased or bought out → they own it
     if (s === "delivered") {
       return {

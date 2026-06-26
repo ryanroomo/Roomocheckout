@@ -51,20 +51,32 @@ export default async function handler(req, res) {
 
     // ── Step 1: Update Supabase FIRST (prevents webhook race condition) ──
     const prevStatus = order.status;
-    const { error: updateErr } = await supabase
+    const { error: updateErr, count: updateCount } = await supabase
       .from("orders")
-      .update({
-        status: "cancelled",
-        cancelled_at: new Date().toISOString(),
-        stripe_subscription_id: null,
-        subscription_ends_at: null,
-      })
-      .eq("id", order.id);
+      .update(
+        {
+          status: "cancelled",
+          cancelled_at: new Date().toISOString(),
+          stripe_subscription_id: null,
+          subscription_ends_at: null,
+        },
+        { count: "exact" }
+      )
+      .eq("id", order.id)
+      .in("status", cancellable);
 
     if (updateErr) throw new Error(`update order: ${updateErr.message}`);
 
+    // Another admin already cancelled this order
+    if (updateCount === 0) {
+      return res.status(409).json({
+        error: "This order was already cancelled by another admin.",
+      });
+    }
+
     // ── Step 2: Refund deposit via Stripe ────────────────────
     let refunded = false;
+    let refundFailed = false;
     if (order.stripe_payment_intent_id && prevStatus !== "pending") {
       try {
         await stripe.refunds.create({
@@ -77,6 +89,7 @@ export default async function handler(req, res) {
           refunded = true;
         } else {
           // Supabase already updated, log error but don't revert
+          refundFailed = true;
           console.error("Refund failed but order already marked cancelled");
         }
       }
@@ -130,9 +143,12 @@ export default async function handler(req, res) {
     res.status(200).json({
       success: true,
       refunded,
+      refundFailed,
       message: refunded
         ? "Order cancelled and deposit refunded."
-        : "Order cancelled (no payment to refund).",
+        : refundFailed
+          ? "Order cancelled but deposit refund FAILED — please process manually in Stripe."
+          : "Order cancelled (no payment to refund).",
     });
   } catch (err) {
     console.error("admin cancel-order error:", err);

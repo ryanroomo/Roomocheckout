@@ -112,15 +112,6 @@ export default async function handler(req, res) {
       }
     }
 
-    // ── Release pre-auth hold if present ────────────────────
-    if (order.stripe_auth_pi_id) {
-      try {
-        await stripe.paymentIntents.cancel(order.stripe_auth_pi_id);
-      } catch (authErr) {
-        console.error("Cancel pre-auth error (non-fatal):", authErr.message);
-      }
-    }
-
     // ── Update order status (with optimistic lock) ─────────────
     const { error: updateErr, count: updateCount } = await supabase
       .from("orders")
@@ -141,6 +132,24 @@ export default async function handler(req, res) {
     }
 
     if (updateErr) throw new Error(`update order: ${updateErr.message}`);
+
+    // ── Release pre-auth hold if present ────────────────────
+    // Re-fetch to get the latest stripe_auth_pi_id in case the cron
+    // added one between our initial fetch and the status update above.
+    const { data: freshOrder } = await supabase
+      .from("orders")
+      .select("stripe_auth_pi_id")
+      .eq("id", order.id)
+      .single();
+
+    const authPiId = freshOrder?.stripe_auth_pi_id || order.stripe_auth_pi_id;
+    if (authPiId) {
+      try {
+        await stripe.paymentIntents.cancel(authPiId);
+      } catch (authErr) {
+        console.error("Cancel pre-auth error (non-fatal):", authErr.message);
+      }
+    }
 
     // ── Record cancellation in payments ledger ───────────────
     if (refunded) {
