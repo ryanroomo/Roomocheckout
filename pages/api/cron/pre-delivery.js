@@ -135,7 +135,8 @@ export default async function handler(req, res) {
               new Date(order.delivery_date).getTime() - 48 * 60 * 60 * 1000
             ).toISOString(),
           })
-          .eq("id", order.id);
+          .eq("id", order.id)
+          .eq("status", "deposit_paid"); // optimistic lock: skip if cancelled in the meantime
 
         if (updateErr) throw new Error(`update order: ${updateErr.message}`);
 

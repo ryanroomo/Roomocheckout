@@ -49,46 +49,8 @@ export default async function handler(req, res) {
       });
     }
 
-    // ── Refund deposit via Stripe ────────────────────────────
-    let refunded = false;
-    if (order.stripe_payment_intent_id && order.status !== "pending") {
-      try {
-        await stripe.refunds.create({
-          payment_intent: order.stripe_payment_intent_id,
-        });
-        refunded = true;
-      } catch (refundErr) {
-        console.error("Stripe refund error:", refundErr.message);
-        if (refundErr.code === "charge_already_refunded") {
-          refunded = true;
-        } else {
-          return res.status(500).json({
-            error: "Stripe refund failed: " + refundErr.message,
-          });
-        }
-      }
-    }
-
-    // ── Release pre-auth hold if authorized ─────────────────
-    if (order.status === "authorized" && order.stripe_auth_pi_id) {
-      try {
-        await stripe.paymentIntents.cancel(order.stripe_auth_pi_id);
-      } catch (authErr) {
-        console.error("Cancel pre-auth error (non-fatal):", authErr.message);
-        // If already cancelled/captured, continue
-      }
-    }
-
-    // ── Cancel Stripe Subscription if active ─────────────────
-    if (order.stripe_subscription_id) {
-      try {
-        await stripe.subscriptions.cancel(order.stripe_subscription_id);
-      } catch (subErr) {
-        console.error("Cancel subscription error (non-fatal):", subErr.message);
-      }
-    }
-
-    // ── Update order status ──────────────────────────────────
+    // ── Step 1: Update Supabase FIRST (prevents webhook race condition) ──
+    const prevStatus = order.status;
     const { error: updateErr } = await supabase
       .from("orders")
       .update({
@@ -100,6 +62,43 @@ export default async function handler(req, res) {
       .eq("id", order.id);
 
     if (updateErr) throw new Error(`update order: ${updateErr.message}`);
+
+    // ── Step 2: Refund deposit via Stripe ────────────────────
+    let refunded = false;
+    if (order.stripe_payment_intent_id && prevStatus !== "pending") {
+      try {
+        await stripe.refunds.create({
+          payment_intent: order.stripe_payment_intent_id,
+        });
+        refunded = true;
+      } catch (refundErr) {
+        console.error("Stripe refund error:", refundErr.message);
+        if (refundErr.code === "charge_already_refunded") {
+          refunded = true;
+        } else {
+          // Supabase already updated, log error but don't revert
+          console.error("Refund failed but order already marked cancelled");
+        }
+      }
+    }
+
+    // ── Step 3: Release pre-auth hold if authorized ──────────
+    if (prevStatus === "authorized" && order.stripe_auth_pi_id) {
+      try {
+        await stripe.paymentIntents.cancel(order.stripe_auth_pi_id);
+      } catch (authErr) {
+        console.error("Cancel pre-auth error (non-fatal):", authErr.message);
+      }
+    }
+
+    // ── Step 4: Cancel Stripe Subscription if exists ─────────
+    if (order.stripe_subscription_id) {
+      try {
+        await stripe.subscriptions.cancel(order.stripe_subscription_id);
+      } catch (subErr) {
+        console.error("Cancel subscription error (non-fatal):", subErr.message);
+      }
+    }
 
     // ── Record in payments ledger ────────────────────────────
     if (refunded) {

@@ -227,6 +227,7 @@ export default async function handler(req, res) {
             .update({ status: "completed" })
             .eq("id", order.id);
         }
+        // If status is "cancelled" — subscription was cancelled by admin/customer, do nothing
         // If status is already "delinquent", leave it as-is for manual review
         break;
       }
