@@ -945,6 +945,38 @@ tbody tr:last-child td {
   </div>
 </div>
 
+<!-- Admin Cancel Order Modal -->
+<div class="day-modal-overlay" id="adminCancelModal">
+  <div class="day-modal" style="max-width:420px">
+    <div class="day-modal-header">
+      <div class="day-modal-title" style="color:var(--red)">Cancel Order</div>
+      <button class="day-modal-close" onclick="closeAdminCancelModal()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="cancelModalBody">
+      <p style="font-size:14px;color:var(--text-secondary);line-height:1.6;margin-bottom:16px">
+        This will cancel the order, refund the customer's deposit via Stripe, and send them a cancellation email. <strong style="color:var(--text)">This action cannot be undone.</strong>
+      </p>
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">
+        Type <strong style="color:var(--text);font-family:monospace;background:var(--bg);padding:2px 6px;border-radius:4px">CONFIRM</strong> to proceed:
+      </p>
+      <input id="cancelConfirmInput" type="text" placeholder="Type CONFIRM" autocomplete="off" style="width:100%;padding:10px 14px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;color:var(--text);outline:none;background:#fff;letter-spacing:0.08em;font-weight:600;margin-bottom:16px">
+      <div id="cancelModalError" style="display:none;font-size:13px;color:var(--red);margin-bottom:12px;padding:8px 12px;background:var(--red-bg);border-radius:8px"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="closeAdminCancelModal()" style="padding:9px 20px;border-radius:8px;border:1.5px solid var(--border);background:transparent;color:var(--text-secondary);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Keep Order</button>
+        <button id="cancelConfirmBtn" disabled style="padding:9px 20px;border-radius:8px;border:none;background:var(--red);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;opacity:0.5;transition:opacity .15s">Cancel Order</button>
+      </div>
+    </div>
+    <div id="cancelModalSuccess" style="display:none;text-align:center;padding:20px 0">
+      <div style="width:48px;height:48px;border-radius:50%;background:var(--green-bg);display:flex;align-items:center;justify-content:center;margin:0 auto 12px">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <div id="cancelSuccessMsg" style="font-size:15px;font-weight:600;color:var(--text)">Order cancelled.</div>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ═══════════════════════════════════════════
    Roomo Admin Portal — Client-Side Logic
@@ -1296,6 +1328,7 @@ function renderOrderDetail(o) {
       <h4>Payment History</h4>
       ${paymentsHtml}
     </div>
+    ${['pending','deposit_paid','authorized'].includes(o.status) ? `<div style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:16px;margin-top:8px;text-align:right"><button onclick="openAdminCancelModal('${o.id}')" style="padding:8px 20px;border-radius:8px;border:1.5px solid var(--red);background:transparent;color:var(--red);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s" onmouseover="this.style.background='var(--red)';this.style.color='#fff'" onmouseout="this.style.background='transparent';this.style.color='var(--red)'">Cancel This Order</button></div>` : ''}
   </div></td></tr>`;
 }
 
@@ -1442,6 +1475,77 @@ document.getElementById('dayModal').addEventListener('click', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     document.getElementById('dayModal').classList.remove('active');
+    document.getElementById('adminCancelModal').classList.remove('active');
+  }
+});
+
+// ═══════════ ADMIN CANCEL ORDER ═══════════
+let cancelTargetId = null;
+
+function openAdminCancelModal(orderId) {
+  cancelTargetId = orderId;
+  document.getElementById('cancelConfirmInput').value = '';
+  document.getElementById('cancelConfirmBtn').disabled = true;
+  document.getElementById('cancelConfirmBtn').textContent = 'Cancel Order';
+  document.getElementById('cancelConfirmBtn').style.opacity = '0.5';
+  document.getElementById('cancelModalError').style.display = 'none';
+  document.getElementById('cancelModalSuccess').style.display = 'none';
+  document.getElementById('cancelModalBody').style.display = 'block';
+  document.getElementById('adminCancelModal').classList.add('active');
+}
+
+function closeAdminCancelModal() {
+  document.getElementById('adminCancelModal').classList.remove('active');
+  cancelTargetId = null;
+}
+
+document.getElementById('adminCancelModal').addEventListener('click', (e) => {
+  if (e.target.id === 'adminCancelModal') closeAdminCancelModal();
+});
+
+document.getElementById('cancelConfirmInput').addEventListener('input', function() {
+  const ok = this.value === 'CONFIRM';
+  document.getElementById('cancelConfirmBtn').disabled = !ok;
+  document.getElementById('cancelConfirmBtn').style.opacity = ok ? '1' : '0.5';
+});
+
+document.getElementById('cancelConfirmBtn').addEventListener('click', async function() {
+  if (!cancelTargetId) return;
+  const btn = this;
+  btn.disabled = true;
+  btn.textContent = 'Cancelling...';
+  btn.style.opacity = '0.7';
+  document.getElementById('cancelModalError').style.display = 'none';
+
+  try {
+    const resp = await fetch('/api/admin/cancel-order', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + getPassword()
+      },
+      body: JSON.stringify({ orderId: cancelTargetId })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || 'Cancellation failed');
+
+    document.getElementById('cancelModalBody').style.display = 'none';
+    document.getElementById('cancelModalSuccess').style.display = 'block';
+    document.getElementById('cancelSuccessMsg').textContent = data.message;
+
+    // Refresh data after 1.5s
+    setTimeout(() => {
+      closeAdminCancelModal();
+      loadOrders();
+      loadDashboard();
+    }, 1500);
+  } catch (err) {
+    document.getElementById('cancelModalError').style.display = 'block';
+    document.getElementById('cancelModalError').textContent = err.message;
+    btn.disabled = false;
+    btn.textContent = 'Cancel Order';
+    btn.style.opacity = '1';
+    document.getElementById('cancelConfirmInput').value = '';
   }
 });
 
