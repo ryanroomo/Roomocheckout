@@ -123,22 +123,38 @@ export default async function handler(req, res) {
             : `Roomo pre-auth: purchase – delivery ${order.delivery_date}`,
         });
 
-        // Update order
-        const { error: updateErr } = await supabase
+        // Update order (optimistic lock: skip if cancelled in the meantime)
+        const { error: updateErr, count: updateCount } = await supabase
           .from("orders")
-          .update({
-            status: "authorized",
-            stripe_auth_pi_id: authPI.id,
-            authorized_amount_cents: authAmountCents,
-            security_deposit_cents: securityDepositCents,
-            refund_deadline: new Date(
-              new Date(order.delivery_date).getTime() - 48 * 60 * 60 * 1000
-            ).toISOString(),
-          })
+          .update(
+            {
+              status: "authorized",
+              stripe_auth_pi_id: authPI.id,
+              authorized_amount_cents: authAmountCents,
+              security_deposit_cents: securityDepositCents,
+              refund_deadline: new Date(
+                new Date(order.delivery_date).getTime() - 48 * 60 * 60 * 1000
+              ).toISOString(),
+            },
+            { count: "exact" }
+          )
           .eq("id", order.id)
-          .eq("status", "deposit_paid"); // optimistic lock: skip if cancelled in the meantime
+          .eq("status", "deposit_paid");
 
         if (updateErr) throw new Error(`update order: ${updateErr.message}`);
+
+        // If 0 rows updated, order was cancelled between query and now.
+        // Release the dangling pre-auth hold we just created.
+        if (updateCount === 0) {
+          console.warn(`Order ${order.id}: status changed (likely cancelled), releasing dangling pre-auth ${authPI.id}`);
+          try {
+            await stripe.paymentIntents.cancel(authPI.id);
+          } catch (cancelErr) {
+            console.error(`Failed to cancel dangling pre-auth ${authPI.id}:`, cancelErr.message);
+          }
+          results.push({ orderId: order.id, status: "skipped_cancelled", note: "Pre-auth released" });
+          continue;
+        }
 
         // Record in payments ledger
         await supabase.from("payments").insert({

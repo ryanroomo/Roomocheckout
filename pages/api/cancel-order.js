@@ -61,12 +61,13 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: "Customer not found" });
     }
 
-    // Find most recent cancellable order (deposit_paid or pending)
+    // Find most recent cancellable order (pending, deposit_paid, or authorized)
+    const cancellable = ["pending", "deposit_paid", "authorized"];
     const { data: order, error: orderErr } = await supabase
       .from("orders")
       .select("*, order_items(*)")
       .eq("customer_id", customer.id)
-      .in("status", ["deposit_paid", "pending"])
+      .in("status", cancellable)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -77,9 +78,22 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "No cancellable order found" });
     }
 
+    // ── Enforce refund deadline (48h before delivery) ────────
+    // Pending orders can always be cancelled (no payment yet).
+    // Paid/authorized orders must be cancelled before the refund deadline.
+    if (order.status !== "pending" && order.refund_deadline) {
+      const deadline = new Date(order.refund_deadline);
+      if (new Date() >= deadline) {
+        return res.status(400).json({
+          error:
+            "The cancellation window has closed (48 hours before delivery). Please contact hello@roomonyc.com for assistance.",
+        });
+      }
+    }
+
     // ── Refund deposit via Stripe ────────────────────────────
     let refunded = false;
-    if (order.stripe_payment_intent_id && order.status === "deposit_paid") {
+    if (order.stripe_payment_intent_id && order.status !== "pending") {
       try {
         await stripe.refunds.create({
           payment_intent: order.stripe_payment_intent_id,
@@ -107,14 +121,24 @@ export default async function handler(req, res) {
       }
     }
 
-    // ── Update order status ──────────────────────────────────
-    const { error: updateErr } = await supabase
+    // ── Update order status (with optimistic lock) ─────────────
+    const { error: updateErr, count: updateCount } = await supabase
       .from("orders")
-      .update({
-        status: "cancelled",
-        cancelled_at: new Date().toISOString(),
-      })
-      .eq("id", order.id);
+      .update(
+        {
+          status: "cancelled",
+          cancelled_at: new Date().toISOString(),
+        },
+        { count: "exact" }
+      )
+      .eq("id", order.id)
+      .in("status", cancellable);
+
+    if (!updateErr && updateCount === 0) {
+      return res.status(409).json({
+        error: "Order status changed — please refresh and try again.",
+      });
+    }
 
     if (updateErr) throw new Error(`update order: ${updateErr.message}`);
 

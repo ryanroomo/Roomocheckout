@@ -16,10 +16,11 @@ export default async function handler(req, res) {
 
   try {
     // Slots are blocked by:
-    //   - any committed order (deposit_paid / balance_charged / delivered)
+    //   - any committed order (deposit_paid, authorized, active, balance_charged, delivered)
     //   - recently-created pending orders (< 30 min) — gives the user time to finish
     //     payment without instantly hogging the slot for everyone else.
     // Older pending orders (abandoned checkouts) are ignored so their slots free up.
+    // Cancelled / failed / completed orders do NOT block slots.
     const PENDING_TTL_MIN = 30;
     const cutoff = new Date(
       Date.now() - PENDING_TTL_MIN * 60 * 1000
@@ -29,7 +30,7 @@ export default async function handler(req, res) {
       .from("orders")
       .select("delivery_date, delivery_slot")
       .or(
-        `status.in.(deposit_paid,balance_charged,delivered),and(status.eq.pending,created_at.gte.${cutoff})`
+        `status.in.(deposit_paid,authorized,active,balance_charged,delivered),and(status.eq.pending,created_at.gte.${cutoff})`
       )
       .not("delivery_date", "is", null)
       .not("delivery_slot", "is", null);
