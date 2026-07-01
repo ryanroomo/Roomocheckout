@@ -118,7 +118,7 @@ export default async function handler(req, res) {
       await supabase.from("payments").insert({
         order_id: order.id,
         type: "refund",
-        amount_cents: order.deposit_cents || 2500,
+        amount_cents: -(order.deposit_cents || 2500), // negative = money returned
         stripe_payment_intent_id: order.stripe_payment_intent_id,
         status: "succeeded",
         description: "Deposit refunded — order cancelled by admin",

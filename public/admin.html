@@ -977,6 +977,38 @@ tbody tr:last-child td {
   </div>
 </div>
 
+<!-- Admin Refund Deposit Modal -->
+<div class="day-modal-overlay" id="adminRefundModal">
+  <div class="day-modal" style="max-width:420px">
+    <div class="day-modal-header">
+      <div class="day-modal-title">Refund Deposit</div>
+      <button class="day-modal-close" onclick="closeRefundModal()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="refundModalBody">
+      <p style="font-size:14px;color:var(--text-secondary);line-height:1.6;margin-bottom:16px">
+        This will refund the customer's <strong style="color:var(--text)">$25 deposit</strong> via Stripe and record it in the ledger. <span id="refundFallbackNote"></span>
+      </p>
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">
+        Type <strong style="color:var(--text);font-family:monospace;background:var(--bg);padding:2px 6px;border-radius:4px">CONFIRM</strong> to proceed:
+      </p>
+      <input id="refundConfirmInput" type="text" placeholder="Type CONFIRM" autocomplete="off" style="width:100%;padding:10px 14px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;color:var(--text);outline:none;background:#fff;letter-spacing:0.08em;font-weight:600;margin-bottom:16px">
+      <div id="refundModalError" style="display:none;font-size:13px;color:var(--red);margin-bottom:12px;padding:8px 12px;background:var(--red-bg);border-radius:8px"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="closeRefundModal()" style="padding:9px 20px;border-radius:8px;border:1.5px solid var(--border);background:transparent;color:var(--text-secondary);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
+        <button id="refundConfirmBtn" disabled style="padding:9px 20px;border-radius:8px;border:none;background:var(--text);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;opacity:0.5;transition:opacity .15s">Refund $25</button>
+      </div>
+    </div>
+    <div id="refundModalSuccess" style="display:none;text-align:center;padding:20px 0">
+      <div style="width:48px;height:48px;border-radius:50%;background:var(--green-bg);display:flex;align-items:center;justify-content:center;margin:0 auto 12px">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <div id="refundSuccessMsg" style="font-size:15px;font-weight:600;color:var(--text)">Deposit refunded.</div>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ═══════════════════════════════════════════
    Roomo Admin Portal — Client-Side Logic
@@ -1387,6 +1419,31 @@ function renderBillingSummary(o) {
   </div>`;
 }
 
+function hasSucceededRefund(o) {
+  return (o.payments || []).some(p => p.type === 'refund' && p.status === 'succeeded');
+}
+
+// Cancel + fallback-refund buttons for the order detail row.
+function renderOrderActions(o) {
+  const canCancel = ['pending', 'deposit_paid', 'authorized'].includes(o.status);
+  const refunded = hasSucceededRefund(o);
+  // Refund: standalone on deposit_paid, or fallback on a cancelled order whose
+  // auto-refund never went through. Hidden once a refund has succeeded.
+  const canRefund = !refunded && (o.status === 'deposit_paid' || o.status === 'cancelled');
+  if (!canCancel && !canRefund) return '';
+
+  let btns = '';
+  if (canRefund) {
+    const fallback = o.status === 'cancelled';
+    const label = fallback ? 'Refund $25 (fallback)' : 'Refund $25 deposit';
+    btns += `<button onclick="openRefundModal('${o.id}', ${fallback})" style="padding:8px 20px;border-radius:8px;border:1.5px solid var(--text-secondary);background:transparent;color:var(--text);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;margin-left:8px">${label}</button>`;
+  }
+  if (canCancel) {
+    btns += `<button onclick="openAdminCancelModal('${o.id}')" style="padding:8px 20px;border-radius:8px;border:1.5px solid var(--red);background:transparent;color:var(--red);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s" onmouseover="this.style.background='var(--red)';this.style.color='#fff'" onmouseout="this.style.background='transparent';this.style.color='var(--red)'">Cancel This Order</button>`;
+  }
+  return `<div style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:16px;margin-top:8px;text-align:right">${btns}</div>`;
+}
+
 function renderOrderDetail(o) {
   const address = o.deliveryAddress || '—';
   const phone = o.customer?.phone || '—';
@@ -1432,7 +1489,7 @@ function renderOrderDetail(o) {
       <h4>Payment History</h4>
       ${paymentsHtml}
     </div>
-    ${['pending','deposit_paid','authorized'].includes(o.status) ? `<div style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:16px;margin-top:8px;text-align:right"><button onclick="openAdminCancelModal('${o.id}')" style="padding:8px 20px;border-radius:8px;border:1.5px solid var(--red);background:transparent;color:var(--red);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s" onmouseover="this.style.background='var(--red)';this.style.color='#fff'" onmouseout="this.style.background='transparent';this.style.color='var(--red)'">Cancel This Order</button></div>` : ''}
+    ${renderOrderActions(o)}
   </div></td></tr>`;
 }
 
@@ -1652,6 +1709,103 @@ document.getElementById('cancelConfirmBtn').addEventListener('click', async func
     document.getElementById('cancelConfirmInput').value = '';
   }
 });
+
+// ─── Admin Refund Modal ───
+let refundTargetId = null;
+
+function openRefundModal(orderId, fallback) {
+  refundTargetId = orderId;
+  document.getElementById('refundConfirmInput').value = '';
+  document.getElementById('refundConfirmBtn').disabled = true;
+  document.getElementById('refundConfirmBtn').textContent = 'Refund $25';
+  document.getElementById('refundConfirmBtn').style.opacity = '0.5';
+  document.getElementById('refundModalError').style.display = 'none';
+  document.getElementById('refundModalSuccess').style.display = 'none';
+  document.getElementById('refundModalBody').style.display = 'block';
+  document.getElementById('refundFallbackNote').textContent = fallback
+    ? 'This order is already cancelled — use this only if the automatic refund failed.'
+    : '';
+  document.getElementById('adminRefundModal').classList.add('active');
+}
+
+function closeRefundModal() {
+  document.getElementById('adminRefundModal').classList.remove('active');
+  refundTargetId = null;
+}
+
+document.getElementById('adminRefundModal').addEventListener('click', (e) => {
+  if (e.target.id === 'adminRefundModal') closeRefundModal();
+});
+
+document.getElementById('refundConfirmInput').addEventListener('input', function() {
+  const ok = this.value === 'CONFIRM';
+  document.getElementById('refundConfirmBtn').disabled = !ok;
+  document.getElementById('refundConfirmBtn').style.opacity = ok ? '1' : '0.5';
+});
+
+document.getElementById('refundConfirmBtn').addEventListener('click', async function() {
+  if (!refundTargetId) return;
+  const btn = this;
+  btn.disabled = true;
+  btn.textContent = 'Refunding...';
+  btn.style.opacity = '0.7';
+  document.getElementById('refundModalError').style.display = 'none';
+  try {
+    const resp = await fetch('/api/admin/refund', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getPassword() },
+      body: JSON.stringify({ orderId: refundTargetId })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || 'Refund failed');
+    document.getElementById('refundModalBody').style.display = 'none';
+    document.getElementById('refundModalSuccess').style.display = 'block';
+    document.getElementById('refundSuccessMsg').textContent = data.message || 'Deposit refunded.';
+    setTimeout(() => { closeRefundModal(); loadOrders(); loadDashboard(); }, 1500);
+  } catch (err) {
+    document.getElementById('refundModalError').style.display = 'block';
+    document.getElementById('refundModalError').textContent = err.message;
+    btn.disabled = false;
+    btn.textContent = 'Refund $25';
+    btn.style.opacity = '1';
+    document.getElementById('refundConfirmInput').value = '';
+  }
+});
+
+// ─── Auto-refresh (poll every 20s) ───
+// Keeps the panel in sync with customer-side cancellations/refunds without a
+// manual reload. Skips while a modal is open, the tab is hidden, or a search is
+// being typed; preserves the currently expanded order.
+function anyModalOpen() {
+  return !!document.querySelector('.day-modal-overlay.active');
+}
+
+async function silentRefreshOrders() {
+  if (!ordersLoaded) return;
+  const status = statusFilter.value;
+  const search = searchInput.value.trim();
+  let url = `/api/admin/orders?limit=${ORDERS_LIMIT}&offset=${ordersOffset}`;
+  if (status !== 'all') url += `&status=${encodeURIComponent(status)}`;
+  if (search) url += `&search=${encodeURIComponent(search)}`;
+  try {
+    const data = await apiFetch(url);
+    ordersData = data.orders || [];
+    ordersTotal = data.total || 0;
+    if (expandedOrderId && !ordersData.some(o => o.id === expandedOrderId)) {
+      expandedOrderId = null;
+    }
+    renderOrdersTable();
+  } catch (err) { /* ignore transient poll errors */ }
+}
+
+setInterval(() => {
+  if (document.hidden || !getPassword() || anyModalOpen()) return;
+  if (document.activeElement === document.getElementById('searchInput')) return;
+  const ordersPanel = document.getElementById('panel-orders');
+  if (ordersPanel && ordersPanel.classList.contains('active')) silentRefreshOrders();
+  const dashPanel = document.getElementById('panel-dashboard');
+  if (dashPanel && dashPanel.classList.contains('active')) loadDashboard();
+}, 20000);
 
 // ─── Init ───
 if (getPassword()) {
