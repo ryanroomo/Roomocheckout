@@ -327,10 +327,11 @@ function StepCart({
         onCouponChange({ ...couponState, status: "checking" })
         try {
             const base = (checkoutBaseUrl || "https://roomocheckout.vercel.app").replace(/\/$/, "")
+            const maxMonths = rentItems.reduce((m, i) => Math.max(m, i.months || 0), 0)
             const res = await fetch(`${base}/api/validate-coupon`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ code: trimmed, cartTotal: totalMonthly }),
+                body: JSON.stringify({ code: trimmed, cartTotal: totalMonthly, months: maxMonths }),
             })
             const data = await res.json()
             if (data.valid) {
@@ -473,10 +474,13 @@ function StepCart({
                                 {couponState.code}
                             </span>
                             <span style={{ fontFamily: font, fontSize: 11, color: C.brownMuted }}>
-                                {couponState.discountType === "percentage"
-                                    ? `${couponState.discountValue}% off`
-                                    : `$${couponState.discountValue} off`}
-                                {couponState.appliesTo === "first_month" ? " first month" : ""}
+                                {couponState.description
+                                    ? couponState.description
+                                    : `${
+                                          couponState.discountType === "percentage"
+                                              ? `${couponState.discountValue}% off`
+                                              : `$${couponState.discountValue} off`
+                                      }${couponState.appliesTo === "first_month" ? " first month" : ""}`}
                             </span>
                         </div>
                         <button onClick={handleRemoveCoupon} style={{
@@ -1001,19 +1005,29 @@ function hashDate(dateStr: string, period: string): number {
     return Math.abs(h)
 }
 
+// Compute the earliest selectable date: today + 3 days, skipping Sundays in the count
+function getEarliestDeliveryDate(): Date {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    let count = 0
+    while (count < 3) {
+        d.setDate(d.getDate() + 1)
+        if (d.getDay() !== 0) count++ // Sundays don't count toward the 3 days
+    }
+    return d
+}
+
 // Pre-compute exactly 9 "booked" slots across all available dates
 function computeBookedSlots(): Set<string> {
-    const startDate = new Date(2026, 5, 26) // June 26
-    const endDate = new Date(2026, 9, 31) // October 31
+    const startDate = getEarliestDeliveryDate()
+    const endDate = new Date(startDate)
+    endDate.setMonth(endDate.getMonth() + 4) // ~4 months out
     const allSlots: { key: string; hash: number }[] = []
     const d = new Date(startDate)
     while (d <= endDate) {
-        if (d.getDay() !== 0) {
-            // skip sunday
-            const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-            allSlots.push({ key: `${ds}-am`, hash: hashDate(ds, "am") })
-            allSlots.push({ key: `${ds}-pm`, hash: hashDate(ds, "pm") })
-        }
+        const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+        allSlots.push({ key: `${ds}-am`, hash: hashDate(ds, "am") })
+        allSlots.push({ key: `${ds}-pm`, hash: hashDate(ds, "pm") })
         d.setDate(d.getDate() + 1)
     }
     // Sort by hash deterministically, pick exactly 9
@@ -1035,8 +1049,9 @@ function StepDate({
     const [selectedDate, setSelectedDate] = useState<string | null>(null)
     const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
     const [showSlotPicker, setShowSlotPicker] = useState(false)
-    const [viewMonth, setViewMonth] = useState(5)
-    const [viewYear, setViewYear] = useState(2026)
+    const earliest = getEarliestDeliveryDate()
+    const [viewMonth, setViewMonth] = useState(earliest.getMonth())
+    const [viewYear, setViewYear] = useState(earliest.getFullYear())
     const [realBooked, setRealBooked] = useState<Set<string>>(new Set())
 
     // Fetch real booked slots from Supabase via the Next.js API
@@ -1066,12 +1081,11 @@ function StepDate({
     const dayNames = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
     const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate()
     const firstDayOfWeek = new Date(viewYear, viewMonth, 1).getDay()
-    const startDate = new Date(2026, 5, 26)
+    const startDate = getEarliestDeliveryDate()
 
     const isSelectable = (day: number) => {
         const d = new Date(viewYear, viewMonth, day)
-        if (d < startDate) return false
-        return d.getDay() !== 0
+        return d >= startDate
     }
 
     const isBooked = (dateStr: string, period: string) => {
@@ -1102,7 +1116,7 @@ function StepDate({
         setShowSlotPicker(true)
     }
 
-    const canPrev = !(viewYear === 2026 && viewMonth === 5)
+    const canPrev = !(viewYear === earliest.getFullYear() && viewMonth === earliest.getMonth())
 
     return (
         <div>

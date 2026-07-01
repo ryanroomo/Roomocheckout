@@ -90,6 +90,46 @@ export default async function handler(req, res) {
       const maxMonths = Math.max(...rentItems.map((i) => i.months || 12));
       const remainingMonths = maxMonths - 1; // first month already paid via capture
 
+      // Building-lease promo (if any) attached to this order.
+      //  • Short lease (< threshold): the intro % off also covers subscription
+      //    months 2..N via a repeating Stripe coupon. Month 1 was already
+      //    discounted at capture (order.discount_cents), so subtract 1.
+      //  • Long lease (≥ threshold): NO subscription discount — the reward is a
+      //    free month of possession at the END, added to subscription_ends_at.
+      let promoCoupon = null;
+      if (order.coupon_code) {
+        const { data: c } = await supabase
+          .from("coupons")
+          .select("*")
+          .eq("code", order.coupon_code)
+          .maybeSingle();
+        promoCoupon = c || null;
+      }
+
+      let promoCouponId; // Stripe coupon id to attach to the subscription (intro %)
+      if (
+        promoCoupon &&
+        promoCoupon.promo_type === "building_lease" &&
+        maxMonths < (promoCoupon.free_month_min_lease || 12) &&
+        (promoCoupon.intro_discount_months || 0) > 1 &&
+        Number(promoCoupon.intro_discount_pct) > 0
+      ) {
+        const introSubMonths = Math.min(
+          (promoCoupon.intro_discount_months || 0) - 1,
+          remainingMonths
+        );
+        if (introSubMonths > 0) {
+          const stripeCoupon = await stripe.coupons.create({
+            percent_off: Number(promoCoupon.intro_discount_pct),
+            duration: "repeating",
+            duration_in_months: introSubMonths,
+            name: `${order.coupon_code} intro ${promoCoupon.intro_discount_pct}%`,
+            metadata: { order_id: order.id, code: order.coupon_code },
+          });
+          promoCouponId = stripeCoupon.id;
+        }
+      }
+
       if (remainingMonths > 0) {
         // Create a Stripe Price for this order's monthly amount
         const product = await stripe.products.create({
@@ -112,6 +152,8 @@ export default async function handler(req, res) {
         const subscription = await stripe.subscriptions.create({
           customer: order.customers.stripe_customer_id,
           items: [{ price: price.id }],
+          // Intro % off for the remaining discounted months (short-lease promo).
+          ...(promoCouponId ? { coupon: promoCouponId } : {}),
           default_payment_method: order.stripe_payment_method_id,
           trial_end: trialEnd,
           cancel_at: cancelAt,
@@ -129,7 +171,13 @@ export default async function handler(req, res) {
         });
 
         subscriptionId = subscription.id;
-        subscriptionEndsAt = new Date(cancelAt * 1000).toISOString();
+
+        // Free month(s) at the END of the lease: extend the lease-end target
+        // (extra possession) WITHOUT extending billing. cancel_at above already
+        // stops the subscription, so no 13th month is ever charged.
+        const bonusMonths = order.bonus_free_months || 0;
+        const endTs = cancelAt + bonusMonths * 30 * 24 * 60 * 60;
+        subscriptionEndsAt = new Date(endTs * 1000).toISOString();
       }
     }
 

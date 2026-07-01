@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   if (req.method !== "POST")
     return res.status(405).json({ error: "Method not allowed" });
 
-  const { code, cartTotal } = req.body || {};
+  const { code, cartTotal, months } = req.body || {};
 
   if (!code || typeof code !== "string") {
     return res.status(400).json({ error: "Coupon code required" });
@@ -57,6 +57,38 @@ export default async function handler(req, res) {
 
     // Calculate discount
     const total = Number(cartTotal) || 0;
+    const leaseMonths = Number(months) || 0;
+
+    // ── Conditional building-lease promo ─────────────────────
+    if (coupon.promo_type === "building_lease") {
+      const threshold = coupon.free_month_min_lease || 12;
+      if (leaseMonths >= threshold) {
+        const n = coupon.bonus_free_months || 0;
+        return res.status(200).json({
+          valid: true,
+          code: coupon.code,
+          discountType: "bonus_month",
+          discountValue: n,
+          discountAmount: 0, // reward is a free month at the end, not a $ discount
+          appliesTo: "bonus_month",
+          description: `${n} free month${n > 1 ? "s" : ""} on your ${threshold}-month lease`,
+          freeMonths: n,
+        });
+      }
+      const pct = Number(coupon.intro_discount_pct) || 0;
+      const im = coupon.intro_discount_months || 0;
+      return res.status(200).json({
+        valid: true,
+        code: coupon.code,
+        discountType: "percentage",
+        discountValue: pct,
+        discountAmount: Math.round(total * (pct / 100)), // per-month saving on rent
+        appliesTo: "first_n_months",
+        description: `${pct}% off your first ${im} month${im > 1 ? "s" : ""}`,
+        introMonths: im,
+      });
+    }
+
     let discountAmount = 0;
 
     if (coupon.discount_type === "percentage") {

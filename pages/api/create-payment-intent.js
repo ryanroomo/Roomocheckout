@@ -77,9 +77,19 @@ export default async function handler(req, res) {
       .filter((i) => i.mode === "buy-new")
       .reduce((sum, i) => sum + Math.round(Number(i.price) || 0) * 100, 0);
 
+    // Longest rental term in the cart — drives the conditional building-lease promo.
+    const leaseMonths = normalized
+      .filter((i) => i.mode === "rent")
+      .reduce((m, i) => Math.max(m, Number(i.months) || 0), 0);
+
     // ── Validate & record coupon if provided ────────────────
+    // NOTE: usage is intentionally NOT incremented here. It is counted in the
+    // Stripe webhook only when the $25 deposit is actually captured, so failed
+    // or abandoned checkouts never consume a code (and never burn a customer's
+    // one-time use). See stripe-webhook.js → payment_intent.succeeded.
     let validatedCoupon = null;
-    let discountCents = 0;
+    let discountCents = 0;     // first-month discount, applied at the 48h pre-auth
+    let bonusFreeMonths = 0;   // free month(s) granted at the END of the lease
     if (couponCode) {
       const { data: coupon } = await supabase
         .from("coupons")
@@ -92,18 +102,48 @@ export default async function handler(req, res) {
         const notExpired = !coupon.expires_at || new Date(coupon.expires_at) >= new Date();
         const hasStarted = !coupon.starts_at || new Date(coupon.starts_at) <= new Date();
         const hasUses = coupon.max_uses === null || coupon.current_uses < coupon.max_uses;
-        if (notExpired && hasStarted && hasUses) {
+
+        // Per-customer limit (e.g. one use per customer for public sticker codes).
+        let underPerCustomerLimit = true;
+        if (coupon.per_customer_limit != null) {
+          const { data: existingCustomer } = await supabase
+            .from("customers")
+            .select("id")
+            .eq("email", email)
+            .maybeSingle();
+          if (existingCustomer) {
+            const { count: redeemedCount } = await supabase
+              .from("coupon_redemptions")
+              .select("id", { count: "exact", head: true })
+              .eq("coupon_id", coupon.id)
+              .eq("customer_id", existingCustomer.id);
+            underPerCustomerLimit = (redeemedCount || 0) < coupon.per_customer_limit;
+          }
+        }
+
+        if (notExpired && hasStarted && hasUses && underPerCustomerLimit) {
           validatedCoupon = coupon;
-          if (coupon.discount_type === "percentage") {
+
+          if (coupon.promo_type === "building_lease") {
+            // Conditional building-sticker promo.
+            const threshold = coupon.free_month_min_lease || 12;
+            if (leaseMonths >= threshold) {
+              // Long lease → free month(s) at the END of the term.
+              // First month is charged normally; the free month is extra
+              // possession with no extra charge (handled in admin/capture.js).
+              bonusFreeMonths = coupon.bonus_free_months || 0;
+              discountCents = 0;
+            } else {
+              // Short lease → intro % off. Month 1 is discounted here; months
+              // 2..N are discounted on the Stripe subscription in capture.js.
+              const pct = Number(coupon.intro_discount_pct) || 0;
+              discountCents = Math.round(rentalMonthlyCents * (pct / 100));
+            }
+          } else if (coupon.discount_type === "percentage") {
             discountCents = Math.round(rentalMonthlyCents * (coupon.discount_value / 100));
           } else {
             discountCents = Math.round(Number(coupon.discount_value) * 100);
           }
-          // Increment usage
-          await supabase
-            .from("coupons")
-            .update({ current_uses: coupon.current_uses + 1 })
-            .eq("id", coupon.id);
         }
       }
     }
@@ -182,6 +222,7 @@ export default async function handler(req, res) {
         buy_total_cents: buyTotalCents,
         coupon_code: validatedCoupon ? validatedCoupon.code : null,
         discount_cents: discountCents,
+        bonus_free_months: bonusFreeMonths,
         stripe_payment_intent_id: paymentIntent.id,
         status: "pending",
       })

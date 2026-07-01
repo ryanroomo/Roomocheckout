@@ -426,10 +426,11 @@ function StepCart({
         onCouponChange({ ...couponState, status: "checking" })
         try {
             const base = (checkoutBaseUrl || "https://roomocheckout.vercel.app").replace(/\/$/, "")
+            const maxMonths = rentItems.reduce((m, i) => Math.max(m, i.months || 0), 0)
             const res = await fetch(`${base}/api/validate-coupon`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ code: trimmed, cartTotal: totalMonthly }),
+                body: JSON.stringify({ code: trimmed, cartTotal: totalMonthly, months: maxMonths }),
             })
             const data = await res.json()
             if (data.valid) {
@@ -572,10 +573,13 @@ function StepCart({
                                 {couponState.code}
                             </span>
                             <span style={{ fontFamily: font, fontSize: 11, color: C.brownMuted }}>
-                                {couponState.discountType === "percentage"
-                                    ? `${couponState.discountValue}% off`
-                                    : `$${couponState.discountValue} off`}
-                                {couponState.appliesTo === "first_month" ? " first month" : ""}
+                                {couponState.description
+                                    ? couponState.description
+                                    : `${
+                                          couponState.discountType === "percentage"
+                                              ? `${couponState.discountValue}% off`
+                                              : `$${couponState.discountValue} off`
+                                      }${couponState.appliesTo === "first_month" ? " first month" : ""}`}
                             </span>
                         </div>
                         <button onClick={handleRemoveCoupon} style={{

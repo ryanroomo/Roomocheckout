@@ -1,0 +1,156 @@
+═══════════════════════════════════════════════════════════
+ROOMO 套组配置总览
+═══════════════════════════════════════════════════════════
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. LIVING SET (Sofa Set)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+颜色:
+  - hudson-haze     (Hudson Haze)
+  - soho-merlot     (Soho Merlot)
+  - central-moss    (Central Moss)
+
+完整物品:
+  - sofa            (Sofa)
+  - coffee-table    (Coffee Table)
+  - lamp            (Floor Lamp)
+  - rug             (Rug)
+  - plant           (Artificial Plant)
+
+可删减项及价格变化:
+  ┌──────────────┬──────────┬──────────┬──────────┐
+  │              │ 4-6 月   │ 7-9 月   │ 10-12 月 │
+  ├──────────────┼──────────┼──────────┼──────────┤
+  │ Full set     │ $549/mo  │ $449/mo  │ $349/mo  │
+  │ - lamp       │ -$35     │ -$30     │ -$20     │
+  │ - plant      │ -$5      │ -$5      │ -$5      │
+  └──────────────┴──────────┴──────────┴──────────┘
+
+  例: 去掉 lamp + plant, 7-9月 = $449 - $30 - $5 = $414/mo
+
+买断价格:
+  - Used: $3,499
+  - New:  $5,499
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. DINING SET
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+颜色:
+  - almond-breeze   (Almond Breeze)
+  - carbon-black    (Carbon Black)
+  - color-theory    (Color Theory)
+
+完整物品:
+  - table           (Dining Table)
+  - chairs          (Dining Chairs)
+  - bench           (Bench)
+  - plant           (Artificial Plant)
+
+可删减项及价格变化:
+  ┌──────────────┬──────────┬──────────┬──────────┐
+  │              │ 4-6 月   │ 7-9 月   │ 10-12 月 │
+  ├──────────────┼──────────┼──────────┼──────────┤
+  │ Full set     │ $449/mo  │ $349/mo  │ $249/mo  │
+  │ - plant      │ -$5      │ -$5      │ -$5      │
+  └──────────────┴──────────┴──────────┴──────────┘
+
+买断价格:
+  - Used: $2,499
+  - New:  $3,999
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. BEDROOM SET
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+颜色:
+  - hudson-haze     (Hudson Haze)
+  - soho-merlot     (Soho Merlot)
+  - central-moss    (Central Moss)
+
+完整物品:
+  - bed-frame       (Bed Frame)
+  - mattress        (Mattress)
+  - pillows         (Pillows)
+  - linens          (Linens)
+
+可删减项及价格变化:
+  ┌──────────────┬──────────┬──────────┬──────────┐
+  │              │ 4-6 月   │ 7-9 月   │ 10-12 月 │
+  ├──────────────┼──────────┼──────────┼──────────┤
+  │ Full set     │ $319/mo  │ $239/mo  │ $199/mo  │
+  │ - mattress   │ -$70     │ -$70     │ -$70     │
+  │              │ =$249/mo │ =$169/mo │ =$129/mo │
+  └──────────────┴──────────┴──────────┴──────────┘
+
+  备注: 如果自己有床垫，我们不处理
+
+买断价格:
+  - Used: $1,999
+  - New:  $3,199
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+图片命名规则
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+格式: {套组}-{颜色}-{配置}.png
+
+套组: living / dining / bedding
+颜色: hudson-haze / soho-merlot / central-moss / almond-breeze / carbon-black / color-theory
+配置: full / no-{物品} / no-{物品1}-no-{物品2}
+
+完整图片列表:
+
+【Living Set — 15 张】
+  living-hudson-haze-full.png
+  living-hudson-haze-no-lamp.png
+  living-hudson-haze-no-plant.png
+  living-hudson-haze-no-lamp-no-plant.png
+  living-soho-merlot-full.png
+  living-soho-merlot-no-lamp.png
+  living-soho-merlot-no-plant.png
+  living-soho-merlot-no-lamp-no-plant.png
+  living-central-moss-full.png
+  living-central-moss-no-lamp.png
+  living-central-moss-no-plant.png
+  living-central-moss-no-lamp-no-plant.png
+  (备用 — 只去掉一个也可以再组合)
+
+【Dining Set — 6 张】
+  dining-almond-breeze-full.png
+  dining-almond-breeze-no-plant.png
+  dining-carbon-black-full.png
+  dining-carbon-black-no-plant.png
+  dining-color-theory-full.png
+  dining-color-theory-no-plant.png
+
+【Bedroom Set — 6 张】
+  bedding-hudson-haze-full.png
+  bedding-hudson-haze-no-mattress.png
+  bedding-soho-merlot-full.png
+  bedding-soho-merlot-no-mattress.png
+  bedding-central-moss-full.png
+  bedding-central-moss-no-mattress.png
+
+总计: 共 24 张图片
+
+图片放置路径:
+  所有图片统一放在 images/ 文件夹下（扁平结构）
+  例: images/living-hudson-haze-full.png
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+租期对应价格速查表
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌─────────┬────────┬────────┬────────┐
+│ Set     │ 4-6mo  │ 7-9mo  │ 10-12mo│
+├─────────┼────────┼────────┼────────┤
+│ Living  │ $549   │ $449   │ $349   │
+│ Dining  │ $449   │ $349   │ $249   │
+│ Bedroom │ $319   │ $239   │ $199   │
+└─────────┴────────┴────────┴────────┘

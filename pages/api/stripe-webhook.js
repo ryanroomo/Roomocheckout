@@ -57,7 +57,7 @@ export default async function handler(req, res) {
         // Set refund_deadline = delivery_date − 48h
         const { data: order } = await supabase
           .from("orders")
-          .select("id, delivery_date")
+          .select("id, delivery_date, customer_id, coupon_code")
           .eq("stripe_payment_intent_id", pi.id)
           .single();
 
@@ -72,14 +72,22 @@ export default async function handler(req, res) {
           ).toISOString();
         }
 
-        const { error } = await supabase
+        // Idempotent transition: only the first pending/failed → deposit_paid
+        // move runs the side effects (ledger, coupon usage, email). Stripe can
+        // re-deliver the same event, so we guard on status to avoid double work
+        // (e.g. two confirmation emails, or double-counting a coupon).
+        const { data: updatedRows, error } = await supabase
           .from("orders")
           .update(updates)
-          .eq("stripe_payment_intent_id", pi.id);
+          .eq("stripe_payment_intent_id", pi.id)
+          .in("status", ["pending", "failed"])
+          .select("id");
         if (error) throw error;
 
+        const isFirstTransition = (updatedRows || []).length > 0;
+
         // Record deposit in payments ledger
-        if (order) {
+        if (order && isFirstTransition) {
           await supabase.from("payments").insert({
             order_id: order.id || undefined,
             type: "deposit",
@@ -88,6 +96,42 @@ export default async function handler(req, res) {
             status: "succeeded",
             description: `$25 deposit paid`,
           });
+
+          // Count coupon usage now that money has actually moved. A unique
+          // (coupon_id, customer_id) row keeps this idempotent AND enforces the
+          // per-customer limit. This is the fix for usage being consumed by
+          // failed/abandoned checkouts.
+          if (order.coupon_code && order.customer_id) {
+            try {
+              const { data: coupon } = await supabase
+                .from("coupons")
+                .select("id, current_uses")
+                .eq("code", order.coupon_code)
+                .maybeSingle();
+              if (coupon) {
+                const { data: redemption } = await supabase
+                  .from("coupon_redemptions")
+                  .upsert(
+                    {
+                      coupon_id: coupon.id,
+                      customer_id: order.customer_id,
+                      order_id: order.id,
+                    },
+                    { onConflict: "coupon_id,customer_id", ignoreDuplicates: true }
+                  )
+                  .select("id");
+                // Only bump the counter when a NEW redemption row was inserted.
+                if (redemption && redemption.length > 0) {
+                  await supabase
+                    .from("coupons")
+                    .update({ current_uses: (coupon.current_uses || 0) + 1 })
+                    .eq("id", coupon.id);
+                }
+              }
+            } catch (couponErr) {
+              console.error("Coupon usage count failed (non-fatal):", couponErr);
+            }
+          }
 
           // Send confirmation email
           try {
