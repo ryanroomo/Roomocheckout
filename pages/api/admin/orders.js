@@ -92,6 +92,25 @@ export default async function handler(req, res) {
 
     if (countError) throw new Error(`count orders: ${countError.message}`);
 
+    // ---- Fetch promo rules for any coupons on these orders ----
+    // Used so "next charge" can show the real discounted amount on the
+    // subscription months that the intro discount still covers.
+    const couponCodes = [
+      ...new Set((orders || []).map((o) => o.coupon_code).filter(Boolean)),
+    ];
+    const couponRules = {};
+    if (couponCodes.length) {
+      const { data: coupons } = await supabase
+        .from("coupons")
+        .select(
+          "code, promo_type, intro_discount_pct, intro_discount_months, free_month_min_lease, bonus_free_months"
+        )
+        .in("code", couponCodes);
+      (coupons || []).forEach((c) => {
+        couponRules[c.code] = c;
+      });
+    }
+
     // ---- Map to camelCase response ----
     const mapped = (orders || []).map((o) => ({
       id: o.id,
@@ -107,6 +126,10 @@ export default async function handler(req, res) {
       couponCode: o.coupon_code,
       discountCents: o.discount_cents,
       bonusFreeMonths: o.bonus_free_months,
+      introDiscountMonths:
+        (o.coupon_code && couponRules[o.coupon_code]?.intro_discount_months) || 0,
+      introDiscountPct:
+        (o.coupon_code && Number(couponRules[o.coupon_code]?.intro_discount_pct)) || 0,
       cancelledAt: o.cancelled_at,
       // Fields used to compute "amount charged so far" and "next charge":
       deliveredAt: o.delivered_at,

@@ -1298,15 +1298,17 @@ function netChargedCents(o) {
   return charges - refunds;
 }
 
-// Estimate the next monthly subscription date (~30-day cycles from delivery).
-function nextSubscriptionDate(o) {
+// Next monthly subscription charge (~30-day cycles from delivery).
+// Returns { date, cycle } where cycle 1 = the first subscription charge
+// (= rental month 2, since month 1 was paid at capture).
+function nextSubscriptionCycle(o) {
   if (!o.deliveredAt) return null;
   const start = new Date(o.deliveredAt).getTime();
   const end = o.subscriptionEndsAt ? new Date(o.subscriptionEndsAt).getTime() : Infinity;
   const now = Date.now();
   for (let k = 1; k <= 36; k++) {
     const t = start + k * 30 * 24 * 3600 * 1000;
-    if (t > now && t <= end) return new Date(t);
+    if (t > now && t <= end) return { date: new Date(t), cycle: k };
   }
   return null;
 }
@@ -1330,9 +1332,21 @@ function nextCharge(o) {
     case 'authorized':
       return { label: 'Capture pre-auth on delivery', amountCents: o.authorizedAmountCents, when: 'On delivery', whenDate: o.deliveryDate || null };
     case 'active': {
-      const d = nextSubscriptionDate(o);
-      const note = (o.couponCode && (o.discountCents || 0) > 0) ? 'An intro discount may reduce the earliest months.' : '';
-      return { label: 'Monthly rent', amountCents: o.rentalMonthlyCents, when: d ? '' : 'Scheduled by Stripe', whenDate: d ? d.toISOString() : null, note };
+      const nx = nextSubscriptionCycle(o);
+      if (!nx) {
+        return { label: 'Monthly rent', amountCents: o.rentalMonthlyCents, when: 'Scheduled by Stripe', whenDate: null };
+      }
+      const introN = o.introDiscountMonths || 0;       // intro covers rental months 1..N
+      const perMonthDiscount = o.discountCents || 0;    // per-month $ off (same value Stripe applies)
+      const rentalMonth = nx.cycle + 1;                 // subscription cycle 1 = rental month 2
+      let amount = o.rentalMonthlyCents;
+      let note = '';
+      if (introN > 0 && perMonthDiscount > 0 && rentalMonth <= introN) {
+        amount = Math.max(0, o.rentalMonthlyCents - perMonthDiscount);
+        const pct = o.introDiscountPct || Math.round((perMonthDiscount / o.rentalMonthlyCents) * 100);
+        note = `Intro ${pct}% off — rental month ${rentalMonth} of ${introN} (full price ${formatCurrency(o.rentalMonthlyCents)})`;
+      }
+      return { label: 'Monthly rent', amountCents: amount, when: '', whenDate: nx.date.toISOString(), note };
     }
     case 'return_scheduled':
       return { label: 'Furniture pickup — no charge', amountCents: null, when: '', whenDate: o.returnDate || null };
