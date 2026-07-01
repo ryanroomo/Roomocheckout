@@ -106,7 +106,16 @@ export default async function handler(req, res) {
       deliveryFeeCents: o.delivery_fee_cents,
       couponCode: o.coupon_code,
       discountCents: o.discount_cents,
+      bonusFreeMonths: o.bonus_free_months,
       cancelledAt: o.cancelled_at,
+      // Fields used to compute "amount charged so far" and "next charge":
+      deliveredAt: o.delivered_at,
+      refundDeadline: o.refund_deadline,
+      authorizedAmountCents: o.authorized_amount_cents,
+      securityDepositCents: o.security_deposit_cents,
+      subscriptionEndsAt: o.subscription_ends_at,
+      stripeSubscriptionId: o.stripe_subscription_id,
+      returnDate: o.return_date,
       customer: o.customers
         ? {
             name: o.customers.name,

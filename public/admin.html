@@ -1283,6 +1283,96 @@ function renderOrdersTable() {
   document.getElementById('nextBtn').disabled = ordersOffset + ORDERS_LIMIT >= ordersTotal;
 }
 
+// ── Billing helpers: what's been charged, and what's next ────
+function isRentalOrder(o) { return (o.rentalMonthlyCents || 0) > 0; }
+
+// Net cash actually collected so far. Pre-auth "holds" (status pending) and
+// failed attempts are excluded; refunds are subtracted.
+function netChargedCents(o) {
+  let charges = 0, refunds = 0;
+  (o.payments || []).forEach(p => {
+    if (p.status !== 'succeeded') return;
+    if (p.type === 'refund') refunds += Math.abs(p.amountCents || 0);
+    else charges += (p.amountCents || 0);
+  });
+  return charges - refunds;
+}
+
+// Estimate the next monthly subscription date (~30-day cycles from delivery).
+function nextSubscriptionDate(o) {
+  if (!o.deliveredAt) return null;
+  const start = new Date(o.deliveredAt).getTime();
+  const end = o.subscriptionEndsAt ? new Date(o.subscriptionEndsAt).getTime() : Infinity;
+  const now = Date.now();
+  for (let k = 1; k <= 36; k++) {
+    const t = start + k * 30 * 24 * 3600 * 1000;
+    if (t > now && t <= end) return new Date(t);
+  }
+  return null;
+}
+
+// The next Stripe charge for this order: label, amount, and when.
+function nextCharge(o) {
+  const rental = isRentalOrder(o);
+  switch (o.status) {
+    case 'pending':
+      return { label: '$25 deposit (awaiting customer payment)', amountCents: o.depositCents, when: 'When customer completes checkout' };
+    case 'deposit_paid': {
+      const firstMonth = Math.max(0, (o.rentalMonthlyCents || 0) - (o.discountCents || 0));
+      const amt = rental
+        ? firstMonth + (o.rentalMonthlyCents || 0) + (o.deliveryFeeCents || 0) - (o.depositCents || 0)
+        : (o.buyTotalCents || 0) + (o.deliveryFeeCents || 0) - (o.depositCents || 0);
+      const label = rental
+        ? 'Pre-authorization: 1st month' + ((o.discountCents || 0) > 0 ? ' (−' + formatCurrency(o.discountCents) + ' coupon)' : '') + ' + security deposit − $25'
+        : 'Pre-authorization: purchase − $25';
+      return { label, amountCents: amt, when: '~48h before delivery', whenDate: o.refundDeadline || null };
+    }
+    case 'authorized':
+      return { label: 'Capture pre-auth on delivery', amountCents: o.authorizedAmountCents, when: 'On delivery', whenDate: o.deliveryDate || null };
+    case 'active': {
+      const d = nextSubscriptionDate(o);
+      const note = (o.couponCode && (o.discountCents || 0) > 0) ? 'An intro discount may reduce the earliest months.' : '';
+      return { label: 'Monthly rent', amountCents: o.rentalMonthlyCents, when: d ? '' : 'Scheduled by Stripe', whenDate: d ? d.toISOString() : null, note };
+    }
+    case 'return_scheduled':
+      return { label: 'Furniture pickup — no charge', amountCents: null, when: '', whenDate: o.returnDate || null };
+    case 'delivered':
+      return { label: 'Owned — no further charges', amountCents: null };
+    case 'completed':
+      return { label: 'Plan completed — no further charges', amountCents: null };
+    case 'delinquent':
+    case 'auth_failed':
+    case 'failed':
+      return { label: '⚠ Payment issue — needs attention', amountCents: null, attention: true };
+    case 'cancelled':
+    case 'refunded':
+      return { label: 'Cancelled — no further charges', amountCents: null };
+    default:
+      return { label: '—', amountCents: null };
+  }
+}
+
+function renderBillingSummary(o) {
+  const nc = nextCharge(o);
+  const net = netChargedCents(o);
+  const couponRow = o.couponCode
+    ? `<div class="detail-row"><span class="label">Coupon</span><span class="value"><span class="badge badge-green">${escapeHtml(o.couponCode)}</span> ${(o.discountCents||0)>0 ? '−'+formatCurrency(o.discountCents)+'/1st mo' : ''}${(o.bonusFreeMonths||0)>0 ? '+'+o.bonusFreeMonths+' free month'+(o.bonusFreeMonths>1?'s':'')+' at end' : ''}</span></div>`
+    : `<div class="detail-row"><span class="label">Coupon</span><span class="value" style="color:var(--text-muted)">None applied</span></div>`;
+
+  const whenText = nc.whenDate ? formatDate(nc.whenDate) : (nc.when || '—');
+  const amountText = nc.amountCents != null ? formatCurrency(nc.amountCents) : '—';
+  const nextColor = nc.attention ? 'var(--red)' : 'var(--text)';
+
+  return `<div class="detail-section" style="grid-column:1/-1;background:var(--bg);border-radius:10px;padding:14px 16px">
+    <h4 style="margin-top:0">Billing Summary</h4>
+    ${couponRow}
+    <div class="detail-row"><span class="label">Charged so far</span><span class="value" style="font-weight:700">${formatCurrency(net)}</span></div>
+    <div class="detail-row"><span class="label">Next charge</span><span class="value" style="font-weight:700;color:${nextColor}">${amountText}${nc.amountCents!=null ? ' · '+whenText : ''}</span></div>
+    <div class="detail-row"><span class="label"></span><span class="value" style="color:var(--text-secondary);font-size:12px">${escapeHtml(nc.label)}</span></div>
+    ${nc.note ? `<div class="detail-row"><span class="label"></span><span class="value" style="color:var(--text-muted);font-size:11px">${escapeHtml(nc.note)}</span></div>` : ''}
+  </div>`;
+}
+
 function renderOrderDetail(o) {
   const address = o.deliveryAddress || '—';
   const phone = o.customer?.phone || '—';
@@ -1312,6 +1402,7 @@ function renderOrderDetail(o) {
   }
 
   return `<tr class="order-detail-row"><td colspan="8"><div class="order-detail">
+    ${renderBillingSummary(o)}
     <div class="detail-section">
       <h4>Order Details</h4>
       <div class="detail-row"><span class="label">Order ID</span><span class="value" style="font-family:monospace;font-size:12px">${o.id || '—'}</span></div>
@@ -1320,7 +1411,6 @@ function renderOrderDetail(o) {
       <div class="detail-row"><span class="label">Delivery Slot</span><span class="value">${o.deliverySlot || '—'}</span></div>
       <div class="detail-row"><span class="label">Deposit</span><span class="value">${formatCurrency(o.depositCents)}</span></div>
       <div class="detail-row"><span class="label">Delivery Fee</span><span class="value">${formatCurrency(o.deliveryFeeCents)}</span></div>
-      ${o.couponCode ? `<div class="detail-row"><span class="label">Coupon</span><span class="value">${escapeHtml(o.couponCode)} (−${formatCurrency(o.discountCents)})</span></div>` : ''}
       <h4 style="margin-top:16px">Items</h4>
       <ul class="detail-items-list">${itemsHtml || '<li style="color:var(--text-muted)">No items</li>'}</ul>
     </div>
