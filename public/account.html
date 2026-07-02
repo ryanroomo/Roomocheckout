@@ -327,8 +327,18 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
 </head>
 <body>
 <div id="bootLoader" style="position:fixed;inset:0;z-index:200000;background:#49372A;display:flex;align-items:center;justify-content:center;transition:opacity .35s ease;">
-  <div style="font-family:'MuseoModerno',cursive;font-weight:800;font-size:56px;letter-spacing:0.04em;color:#F9F5F1;">ROOMO</div>
+  <div class="boot-logo" aria-label="ROOMO"><span>R</span><span>O</span><span>O</span><span>M</span><span>O</span></div>
 </div>
+<style>
+  #bootLoader .boot-logo{ font-family:'MuseoModerno',cursive; font-weight:400; font-size:28px; letter-spacing:normal; color:#F9F5F1; display:flex; }
+  #bootLoader .boot-logo span{ display:inline-block; animation:bootWave 1.1s ease-in-out infinite; }
+  #bootLoader .boot-logo span:nth-child(1){ animation-delay:0s; }
+  #bootLoader .boot-logo span:nth-child(2){ animation-delay:.09s; }
+  #bootLoader .boot-logo span:nth-child(3){ animation-delay:.18s; }
+  #bootLoader .boot-logo span:nth-child(4){ animation-delay:.27s; }
+  #bootLoader .boot-logo span:nth-child(5){ animation-delay:.36s; }
+  @keyframes bootWave{ 0%,55%,100%{ transform:translateY(0); } 25%{ transform:translateY(-3px); } }
+</style>
 <script>
   window.__hideBoot = function(){ var el=document.getElementById('bootLoader'); if(el && el.style.display!=='none'){ el.style.opacity='0'; setTimeout(function(){ el.style.display='none'; }, 350); } };
   setTimeout(function(){ if(window.__hideBoot) window.__hideBoot(); }, 8000); // safety: never stick
