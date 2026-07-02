@@ -50,22 +50,33 @@ export default async function handler(req, res) {
 
   try {
     const { token, reason } = req.body || {};
-    if (!token) {
-      return res.status(400).json({ error: "Missing token" });
+
+    // Resolve email, most-secure first:
+    //   1. Bearer JWT (a real logged-in session)
+    //   2. signed token   3. legacy base64 token
+    let email = null;
+
+    const authHeader = req.headers.authorization || "";
+    const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    if (bearer) {
+      const { data, error } = await supabase.auth.getUser(bearer);
+      if (!error && data?.user?.email) email = data.user.email;
     }
 
-    // Resolve email: signed token first, then legacy base64 fallback.
-    let email = verifyPortalToken(token);
-    if (!email) {
-      try {
-        const decoded = Buffer.from(token, "base64").toString("utf-8");
-        if (decoded.includes("@")) email = decoded;
-      } catch {
-        /* ignore */
+    if (!email && token) {
+      email = verifyPortalToken(token);
+      if (!email) {
+        try {
+          const decoded = Buffer.from(token, "base64").toString("utf-8");
+          if (decoded.includes("@")) email = decoded;
+        } catch {
+          /* ignore */
+        }
       }
     }
+
     if (!email || !email.includes("@")) {
-      return res.status(400).json({ error: "Invalid token" });
+      return res.status(401).json({ error: "Not authenticated" });
     }
 
     // Find customer

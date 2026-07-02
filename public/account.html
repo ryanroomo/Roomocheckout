@@ -323,6 +323,7 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
   .delivery-meta { padding: var(--space-lg); }
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <div class="demo-bar">
@@ -1422,18 +1423,23 @@ function mapApiToBackend(api) {
 var BACKEND = DEMO_BACKEND;   // default, will be replaced if API succeeds
 var _apiData = null;           // raw API response
 
-(function loadPortalData() {
+function loadPortalData(authHeader) {
   var params = new URLSearchParams(window.location.search);
   var token = params.get('token');
 
-  // If no token or demo mode, keep DEMO_BACKEND
-  if (!token || params.has('demo') || params.has('status')) return;
+  // Demo mode keeps DEMO_BACKEND
+  if (params.has('demo') || params.has('status')) return;
+  // Need either a logged-in session (authHeader) or an email-link token
+  if (!token && !authHeader) return;
 
   // Show loading state while fetching real data (avoids flash of demo data)
   document.body.classList.add('page-loading');
 
-  // Fetch from API
-  fetch('/api/user/portal-status?token=' + encodeURIComponent(token))
+  // Fetch from API — a real session (Bearer) is preferred; fall back to the
+  // email-link token for legacy links.
+  var _url = '/api/user/portal-status' + (token ? ('?token=' + encodeURIComponent(token)) : '');
+  var _opts = authHeader ? { headers: { Authorization: authHeader } } : {};
+  fetch(_url, _opts)
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.error) { console.warn('portal-status:', data.error); return; }
@@ -1491,7 +1497,7 @@ var _apiData = null;           // raw API response
       // On error, show page with demo data rather than stuck loading
       document.body.classList.remove('page-loading');
     });
-})();
+}
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Helper: always returns the current effective payment method
@@ -2349,9 +2355,11 @@ async function confirmCancelOrder() {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
     const base = window.location.origin;
+    const _hdrs = { 'Content-Type': 'application/json' };
+    if (window.__accessToken) _hdrs['Authorization'] = 'Bearer ' + window.__accessToken;
     const resp = await fetch(base + '/api/cancel-order', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: _hdrs,
       body: JSON.stringify({ token: token })
     });
     const data = await resp.json();
@@ -2961,6 +2969,197 @@ const _demoMode = _urlParams.has('demo') || _urlParams.has('status');
 if (_demoMode) { document.querySelector('.demo-bar').style.display = 'flex'; }
 const _initStatus = parseInt(_urlParams.get('status')) || 3;
 switchStatus(_initStatus);
+</script>
+<!-- ═══════════════ CUSTOMER AUTH LAYER (Supabase) ═══════════════ -->
+<style>
+  .auth-cover{position:fixed;inset:0;z-index:100000;background:#F9F5F1;display:none;align-items:center;justify-content:center;padding:24px;font-family:'Trebuchet MS',Trebuchet,Arial,sans-serif;}
+  .auth-cover.show{display:flex;}
+  .auth-card{width:100%;max-width:380px;background:#fff;border:1px solid #E8E0D6;border-radius:16px;padding:28px 24px;box-shadow:0 8px 40px rgba(73,55,42,0.10);}
+  .auth-logo{font-family:'MuseoModerno','Trebuchet MS',sans-serif;font-weight:800;font-size:22px;color:#49372A;text-align:center;letter-spacing:0.02em;margin-bottom:4px;}
+  .auth-title{font-size:18px;font-weight:700;color:#49372A;text-align:center;margin:8px 0 4px;}
+  .auth-sub{font-size:13px;color:#8B7355;text-align:center;line-height:1.5;margin-bottom:18px;}
+  .auth-input{width:100%;box-sizing:border-box;padding:11px 13px;border:1.5px solid #E8E0D6;border-radius:10px;font-family:inherit;font-size:14px;color:#49372A;outline:none;background:#fff;margin-bottom:10px;}
+  .auth-btn{width:100%;box-sizing:border-box;padding:12px 0;border-radius:999px;border:none;background:#49372A;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;}
+  .auth-btn.secondary{background:#fff;color:#49372A;border:1.5px solid #E8E0D6;}
+  .auth-google{width:100%;box-sizing:border-box;padding:11px 0;border-radius:999px;border:1.5px solid #E8E0D6;background:#fff;color:#3c4043;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;}
+  .auth-or{display:flex;align-items:center;gap:10px;color:#A09484;font-size:11px;margin:14px 0;}
+  .auth-or::before,.auth-or::after{content:'';flex:1;height:1px;background:#E8E0D6;}
+  .auth-link{background:none;border:none;color:#8B7355;font-family:inherit;font-size:12px;text-decoration:underline;cursor:pointer;padding:4px;}
+  .auth-err{display:none;font-size:12px;color:#C44B4B;background:#FDF0F0;border-radius:8px;padding:8px 10px;margin-bottom:10px;}
+  .auth-ok{display:none;font-size:12px;color:#4A7C59;background:#E8F0E8;border-radius:8px;padding:8px 10px;margin-bottom:10px;}
+</style>
+
+<!-- Login (returning visitors, no session) -->
+<div class="auth-cover" id="authLogin">
+  <div class="auth-card">
+    <div class="auth-logo">ROOMO</div>
+    <div class="auth-title">Access your orders</div>
+    <div class="auth-sub">Log in to view and manage your Roomo plan.</div>
+    <div class="auth-err" id="loginErr"></div>
+    <div class="auth-ok" id="loginOk"></div>
+    <input class="auth-input" id="loginEmail" type="email" placeholder="Email" autocomplete="email">
+    <input class="auth-input" id="loginPass" type="password" placeholder="Password" autocomplete="current-password">
+    <button class="auth-btn" id="loginBtn" style="margin-bottom:8px">Log in</button>
+    <button class="auth-link" id="loginMagic">Email me a login link instead</button>
+    <div class="auth-or">or</div>
+    <button class="auth-google" id="loginGoogle">
+      <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.9 2.4 30.4 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.3 13.1 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.5 3-2.2 5.5-4.7 7.2l7.3 5.7C43.8 38 46.5 31.8 46.5 24.5z"/><path fill="#FBBC05" d="M10.5 28.3c-.5-1.5-.8-3.1-.8-4.8s.3-3.3.8-4.8l-7.9-6.1C.9 15.9 0 19.8 0 23.5s.9 7.6 2.6 10.9l7.9-6.1z"/><path fill="#34A853" d="M24 47c6.4 0 11.9-2.1 15.8-5.8l-7.3-5.7c-2 1.4-4.7 2.3-8.5 2.3-6.3 0-11.7-3.6-13.5-8.8l-7.9 6.1C6.5 42.6 14.6 47 24 47z"/></svg>
+      Continue with Google
+    </button>
+  </div>
+</div>
+
+<!-- Onboarding (first visit from email link) -->
+<div class="auth-cover" id="authOnboard">
+  <div class="auth-card">
+    <div class="auth-logo">ROOMO</div>
+    <div class="auth-title">Secure your account</div>
+    <div class="auth-sub">Set a password so you can log in anytime — or continue with Google. You can always skip and keep using your email link.</div>
+    <div class="auth-err" id="obErr"></div>
+    <div class="auth-ok" id="obOk"></div>
+    <input class="auth-input" id="obPass" type="password" placeholder="Create a password (min 8 chars)" autocomplete="new-password">
+    <button class="auth-btn" id="obSetPass" style="margin-bottom:8px">Set password</button>
+    <div class="auth-or">or</div>
+    <button class="auth-google" id="obGoogle" style="margin-bottom:12px">
+      <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.9 2.4 30.4 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.3 13.1 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.5 3-2.2 5.5-4.7 7.2l7.3 5.7C43.8 38 46.5 31.8 46.5 24.5z"/><path fill="#FBBC05" d="M10.5 28.3c-.5-1.5-.8-3.1-.8-4.8s.3-3.3.8-4.8l-7.9-6.1C.9 15.9 0 19.8 0 23.5s.9 7.6 2.6 10.9l7.9-6.1z"/><path fill="#34A853" d="M24 47c6.4 0 11.9-2.1 15.8-5.8l-7.3-5.7c-2 1.4-4.7 2.3-8.5 2.3-6.3 0-11.7-3.6-13.5-8.8l-7.9 6.1C6.5 42.6 14.6 47 24 47z"/></svg>
+      Continue with Google
+    </button>
+    <button class="auth-link" id="obSkip" style="display:block;margin:0 auto">Skip for now</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  var sb = null, orderEmail = null;
+  function $(id){ return document.getElementById(id); }
+  function show(id){ $(id).classList.add('show'); }
+  function hide(id){ $(id).classList.remove('show'); }
+  function err(id,msg){ var e=$(id); e.textContent=msg; e.style.display='block'; }
+  function ok(id,msg){ var e=$(id); e.textContent=msg; e.style.display='block'; }
+
+  window.__showLogin = function(){ show('authLogin'); };
+  window.__hideLogin = function(){ hide('authLogin'); };
+  window.__showOnboard = function(email){ orderEmail = email; show('authOnboard'); };
+
+  async function boot(){
+    var params = new URLSearchParams(location.search);
+    if (params.has('demo') || params.has('status')) return; // demo mode untouched
+
+    document.body.classList.add('page-loading');
+
+    var cfg = {};
+    try { cfg = await fetch('/api/public-config').then(function(r){return r.json();}); } catch(e){}
+    if (window.supabase && cfg.supabaseUrl && cfg.supabaseAnonKey) {
+      sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+      window.__sb = sb;
+    }
+
+    var token = params.get('token');
+
+    // No Supabase configured → fall back to legacy token behavior.
+    if (!sb) {
+      if (token) { loadPortalData(null); } else { document.body.classList.remove('page-loading'); }
+      return;
+    }
+
+    // 1) Arrived via email link → turn it into a real session, then onboard.
+    var onboardEmail = null;
+    if (token) {
+      try {
+        var res = await fetch('/api/auth/claim', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ token: token })
+        }).then(function(r){ return r.json(); });
+        if (res && res.tokenHash) {
+          var v = await sb.auth.verifyOtp({ token_hash: res.tokenHash, type: 'email' });
+          if (v.error) { v = await sb.auth.verifyOtp({ token_hash: res.tokenHash, type: 'magiclink' }); }
+          if (!v.error) {
+            onboardEmail = res.email;
+            history.replaceState(null, '', location.pathname); // drop token from URL
+            token = null;
+          }
+        } else if (res && res.actionLink) {
+          location.href = res.actionLink; return; // fallback: magic link redirect
+        }
+      } catch(e) { /* fall through to legacy/token load */ }
+    }
+
+    // 2) Resolve any active session
+    var authHeader = null;
+    try {
+      var s = await sb.auth.getSession();
+      if (s.data && s.data.session) {
+        authHeader = 'Bearer ' + s.data.session.access_token;
+        window.__accessToken = s.data.session.access_token;
+        orderEmail = orderEmail || s.data.session.user.email;
+      }
+    } catch(e){}
+
+    // 3) Route
+    if (authHeader) {
+      loadPortalData(authHeader);
+      if (onboardEmail) window.__showOnboard(onboardEmail);
+    } else if (token) {
+      loadPortalData(null); // legacy token, couldn't mint a session
+    } else {
+      document.body.classList.remove('page-loading');
+      window.__showLogin();
+    }
+
+    // Handle OAuth redirect back / any sign-in
+    sb.auth.onAuthStateChange(function(event, session){
+      if (event === 'SIGNED_IN' && session) {
+        window.__accessToken = session.access_token;
+        orderEmail = orderEmail || session.user.email;
+        window.__hideLogin();
+        loadPortalData('Bearer ' + session.access_token);
+      }
+    });
+  }
+
+  // ── Login handlers ──
+  document.addEventListener('DOMContentLoaded', function(){
+    $('loginBtn').addEventListener('click', async function(){
+      $('loginErr').style.display='none';
+      var email = $('loginEmail').value.trim(), pass = $('loginPass').value;
+      if (!email || !pass) { err('loginErr','Enter your email and password.'); return; }
+      this.textContent='Logging in...'; this.disabled=true;
+      var r = await sb.auth.signInWithPassword({ email: email, password: pass });
+      this.textContent='Log in'; this.disabled=false;
+      if (r.error) { err('loginErr', r.error.message); }
+      // success handled by onAuthStateChange
+    });
+    $('loginGoogle').addEventListener('click', function(){
+      sb.auth.signInWithOAuth({ provider:'google', options:{ redirectTo: location.origin + location.pathname } });
+    });
+    $('loginMagic').addEventListener('click', async function(){
+      $('loginErr').style.display='none'; $('loginOk').style.display='none';
+      var email = $('loginEmail').value.trim();
+      if (!email) { err('loginErr','Enter your email first.'); return; }
+      var r = await sb.auth.signInWithOtp({ email: email, options:{ emailRedirectTo: location.origin + location.pathname } });
+      if (r.error) { err('loginErr', r.error.message); } else { ok('loginOk','Check your email for a login link.'); }
+    });
+
+    // ── Onboarding handlers ──
+    $('obSetPass').addEventListener('click', async function(){
+      $('obErr').style.display='none'; $('obOk').style.display='none';
+      var pass = $('obPass').value;
+      if (!pass || pass.length < 8) { err('obErr','Password must be at least 8 characters.'); return; }
+      this.textContent='Saving...'; this.disabled=true;
+      var r = await sb.auth.updateUser({ password: pass });
+      this.textContent='Set password'; this.disabled=false;
+      if (r.error) { err('obErr', r.error.message); }
+      else { ok('obOk','Password set! You can now log in with email + password.'); setTimeout(function(){ hide('authOnboard'); }, 1400); }
+    });
+    $('obGoogle').addEventListener('click', function(){
+      // Links the Google account to the current signed-in user.
+      sb.auth.linkIdentity({ provider:'google', options:{ redirectTo: location.origin + location.pathname } });
+    });
+    $('obSkip').addEventListener('click', function(){ hide('authOnboard'); });
+
+    boot();
+  });
+})();
 </script>
 </body>
 </html>
