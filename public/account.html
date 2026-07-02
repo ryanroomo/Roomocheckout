@@ -326,6 +326,13 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
+<div id="bootLoader" style="position:fixed;inset:0;z-index:200000;background:#49372A;display:flex;align-items:center;justify-content:center;transition:opacity .35s ease;">
+  <div style="font-family:'MuseoModerno',cursive;font-weight:800;font-size:56px;letter-spacing:0.04em;color:#F9F5F1;">ROOMO</div>
+</div>
+<script>
+  window.__hideBoot = function(){ var el=document.getElementById('bootLoader'); if(el && el.style.display!=='none'){ el.style.opacity='0'; setTimeout(function(){ el.style.display='none'; }, 350); } };
+  setTimeout(function(){ if(window.__hideBoot) window.__hideBoot(); }, 8000); // safety: never stick
+</script>
 <div class="demo-bar">
   <label>Status Preview</label>
   <select id="statusSelect" onchange="switchStatus(this.value)">
@@ -1490,12 +1497,12 @@ function loadPortalData(authHeader) {
       renderHero(currentStatus);
       renderContent(currentStatus, currentTab);
       // Reveal page now that real data is rendered
-      document.body.classList.remove('page-loading');
+      document.body.classList.remove('page-loading'); if(window.__hideBoot)window.__hideBoot();
     })
     .catch(function(err) {
       console.warn('Could not load portal data:', err);
       // On error, show page with demo data rather than stuck loading
-      document.body.classList.remove('page-loading');
+      document.body.classList.remove('page-loading'); if(window.__hideBoot)window.__hideBoot();
     });
 }
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3089,8 +3096,8 @@ switchStatus(_initStatus);
       var sn=document.getElementById('sidebarName'), se=document.getElementById('sidebarEmail');
       if(sn) sn.textContent=BACKEND.user.name; if(se) se.textContent=BACKEND.user.email;
       renderHero(currentStatus); renderContent(currentStatus, currentTab);
-      document.body.classList.remove('page-loading');
-    } catch(e){ console.error('preview error', e); document.body.classList.remove('page-loading'); }
+      document.body.classList.remove('page-loading'); if(window.__hideBoot)window.__hideBoot();
+    } catch(e){ console.error('preview error', e); document.body.classList.remove('page-loading'); if(window.__hideBoot)window.__hideBoot(); }
   }
 
   // ── Read-only "view as customer": real data via token, all actions no-op ──
@@ -3109,7 +3116,7 @@ switchStatus(_initStatus);
 
     // Preview sandbox — any status + config, fake data, no login.
     if (params.has('status') || params.has('preview')) { applyPreview(params); return; }
-    if (params.has('demo')) return; // legacy demo, untouched
+    if (params.has('demo')) { if(window.__hideBoot)window.__hideBoot(); return; } // legacy demo, untouched
 
     // Read-only "view as customer" (admin) — real data via signed token, no
     // session; every customer action is disabled.
@@ -3133,7 +3140,7 @@ switchStatus(_initStatus);
 
     // No Supabase configured → fall back to legacy token behavior.
     if (!sb) {
-      if (token) { loadPortalData(null); } else { document.body.classList.remove('page-loading'); }
+      if (token) { loadPortalData(null); } else { document.body.classList.remove('page-loading'); if(window.__hideBoot)window.__hideBoot(); }
       return;
     }
 
@@ -3177,7 +3184,7 @@ switchStatus(_initStatus);
     } else if (token) {
       loadPortalData(null); // legacy token, couldn't mint a session
     } else {
-      document.body.classList.remove('page-loading');
+      document.body.classList.remove('page-loading'); if(window.__hideBoot)window.__hideBoot();
       window.__showLogin();
     }
 
