@@ -228,6 +228,7 @@ export default async function handler(req, res) {
             securityDeposit: (order.security_deposit_cents || 0) / 100,
             subscriptionEndsAt: order.subscription_ends_at,
             returnDate: order.return_date,
+            refundRequestedAt: order.refund_requested_at,
             createdAt: order.created_at,
           }
         : null,

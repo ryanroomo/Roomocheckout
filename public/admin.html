@@ -875,6 +875,7 @@ tbody tr:last-child td {
       <div class="orders-toolbar">
         <select class="filter-select" id="statusFilter">
           <option value="all">All Statuses</option>
+          <option value="refund_requested">⚠ Refund requested</option>
           <option value="pending">Pending</option>
           <option value="deposit_paid">Deposit Paid</option>
           <option value="authorized">Authorized</option>
@@ -1281,7 +1282,7 @@ function renderOrdersTable() {
       <td style="font-family:monospace;font-size:13px;color:var(--text-secondary)">${shortId(o.id)}</td>
       <td style="font-weight:600">${name}</td>
       <td style="color:var(--text-secondary)">${email}</td>
-      <td><span class="badge ${statusBadgeClass(o.status)}">${statusLabel(o.status)}</span></td>
+      <td><span class="badge ${statusBadgeClass(o.status)}">${statusLabel(o.status)}</span>${refundRequestBadge(o)}</td>
       <td style="color:var(--text-secondary)">${formatDate(o.deliveryDate)}</td>
       <td>${escapeHtml(items)}</td>
       <td style="font-weight:600">${formatCurrency(o.rentalMonthlyCents)}</td>
@@ -1409,8 +1410,13 @@ function renderBillingSummary(o) {
   const amountText = nc.amountCents != null ? formatCurrency(nc.amountCents) : '—';
   const nextColor = nc.attention ? 'var(--red)' : 'var(--text)';
 
+  const requestRow = isRefundRequested(o)
+    ? `<div class="detail-row" style="background:var(--red-bg);border-radius:8px;padding:8px 10px;margin-bottom:8px"><span class="label" style="color:var(--red);font-weight:700">⚠ Refund requested</span><span class="value" style="color:var(--red)">${formatDate(o.refundRequestedAt)}${o.refundRequestReason ? ' · ' + escapeHtml(o.refundRequestReason) : ''} — review &amp; process below</span></div>`
+    : '';
+
   return `<div class="detail-section" style="grid-column:1/-1;background:var(--bg);border-radius:10px;padding:14px 16px">
     <h4 style="margin-top:0">Billing Summary</h4>
+    ${requestRow}
     ${couponRow}
     <div class="detail-row"><span class="label">Charged so far</span><span class="value" style="font-weight:700">${formatCurrency(net)}</span></div>
     <div class="detail-row"><span class="label">Next charge</span><span class="value" style="font-weight:700;color:${nextColor}">${amountText}${nc.amountCents!=null ? ' · '+whenText : ''}</span></div>
@@ -1421,6 +1427,16 @@ function renderBillingSummary(o) {
 
 function hasSucceededRefund(o) {
   return (o.payments || []).some(p => p.type === 'refund' && p.status === 'succeeded');
+}
+
+// A customer has requested a refund and it hasn't been processed yet.
+function isRefundRequested(o) {
+  return !!o.refundRequestedAt && ['deposit_paid', 'authorized'].includes(o.status);
+}
+function refundRequestBadge(o) {
+  return isRefundRequested(o)
+    ? ' <span class="badge badge-amber">⚠ Refund requested</span>'
+    : '';
 }
 
 // Cancel + fallback-refund buttons for the order detail row.

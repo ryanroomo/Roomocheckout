@@ -48,14 +48,24 @@ export default async function handler(req, res) {
     const limit = parseInt(rawLimit, 10) || 50;
     const offset = parseInt(rawOffset, 10) || 0;
 
+    // Applies the status filter. Supports a synthetic "refund_requested" value:
+    // orders with a pending refund request awaiting admin action.
+    const applyStatusFilter = (q) => {
+      if (!statusFilter || statusFilter === "all") return q;
+      if (statusFilter === "refund_requested") {
+        return q
+          .not("refund_requested_at", "is", null)
+          .in("status", ["deposit_paid", "authorized"]);
+      }
+      return q.eq("status", statusFilter);
+    };
+
     // ---- Build the data query ----
     let query = supabase
       .from("orders")
       .select("*, order_items(*), payments(*), customers!inner(*)");
 
-    if (statusFilter && statusFilter !== "all") {
-      query = query.eq("status", statusFilter);
-    }
+    query = applyStatusFilter(query);
 
     if (search) {
       query = query.or(
@@ -77,9 +87,7 @@ export default async function handler(req, res) {
       .from("orders")
       .select("*, customers!inner(*)", { count: "exact", head: true });
 
-    if (statusFilter && statusFilter !== "all") {
-      countQuery = countQuery.eq("status", statusFilter);
-    }
+    countQuery = applyStatusFilter(countQuery);
 
     if (search) {
       countQuery = countQuery.or(
@@ -126,6 +134,8 @@ export default async function handler(req, res) {
       couponCode: o.coupon_code,
       discountCents: o.discount_cents,
       bonusFreeMonths: o.bonus_free_months,
+      refundRequestedAt: o.refund_requested_at,
+      refundRequestReason: o.refund_request_reason,
       introDiscountMonths:
         (o.coupon_code && couponRules[o.coupon_code]?.intro_discount_months) || 0,
       introDiscountPct:

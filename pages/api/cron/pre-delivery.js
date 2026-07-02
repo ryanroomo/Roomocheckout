@@ -43,11 +43,14 @@ export default async function handler(req, res) {
     const now = new Date();
     const in48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
 
-    // Find orders that are deposit_paid and delivery is within 48h
+    // Find orders that are deposit_paid and delivery is within 48h.
+    // Skip any order with a pending refund request — we don't want to charge
+    // the big first-month + deposit while the customer is waiting on review.
     const { data: orders, error: fetchErr } = await supabase
       .from("orders")
       .select("*, customers(*)")
       .eq("status", "deposit_paid")
+      .is("refund_requested_at", null)
       .not("delivery_date", "is", null)
       .lte("delivery_date", in48h.toISOString().split("T")[0]);
 

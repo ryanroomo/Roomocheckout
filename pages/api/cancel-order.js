@@ -1,6 +1,9 @@
 import Stripe from "stripe";
 import { supabase } from "../../lib/supabase";
-import { sendCancellationEmail } from "../../lib/email";
+import {
+  sendCancellationEmail,
+  sendRefundRequestNotification,
+} from "../../lib/email";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2024-06-20",
@@ -25,6 +28,18 @@ function setCors(req, res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
+/**
+ * POST /api/cancel-order   (customer, token-based)
+ *
+ * Customers can NO LONGER self-refund. Behaviour now depends on payment state:
+ *   • pending (unpaid)          → cancelled immediately (no money moved).
+ *   • deposit_paid / authorized → a refund REQUEST is filed for admin review.
+ *                                 No Stripe refund, no status change. The team
+ *                                 is emailed, and the 48h pre-auth cron skips
+ *                                 the order while the request is pending.
+ *
+ * Returns { mode: 'cancelled' | 'requested' | 'already_requested' }.
+ */
 export default async function handler(req, res) {
   setCors(req, res);
   if (req.method === "OPTIONS") return res.status(200).end();
@@ -33,7 +48,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { token } = req.body;
+    const { token, reason } = req.body || {};
     if (!token) {
       return res.status(400).json({ error: "Missing token" });
     }
@@ -45,7 +60,6 @@ export default async function handler(req, res) {
     } catch {
       return res.status(400).json({ error: "Invalid token" });
     }
-
     if (!email || !email.includes("@")) {
       return res.status(400).json({ error: "Invalid token" });
     }
@@ -61,126 +75,114 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: "Customer not found" });
     }
 
-    // Find most recent cancellable order (pending, deposit_paid, or authorized)
-    const cancellable = ["pending", "deposit_paid", "authorized"];
+    // Most recent order that can be cancelled/requested
+    const actionable = ["pending", "deposit_paid", "authorized"];
     const { data: order, error: orderErr } = await supabase
       .from("orders")
       .select("*, order_items(*)")
       .eq("customer_id", customer.id)
-      .in("status", cancellable)
+      .in("status", actionable)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (orderErr) throw new Error(`fetch order: ${orderErr.message}`);
-
     if (!order) {
       return res.status(400).json({ error: "No cancellable order found" });
     }
 
-    // ── Enforce refund deadline (48h before delivery) ────────
-    // Pending orders can always be cancelled (no payment yet).
-    // Paid/authorized orders must be cancelled before the refund deadline.
-    if (order.status !== "pending" && order.refund_deadline) {
-      const deadline = new Date(order.refund_deadline);
-      if (new Date() >= deadline) {
-        return res.status(400).json({
-          error:
-            "The cancellation window has closed (48 hours before delivery). Please contact hello@roomonyc.com for assistance.",
-        });
-      }
-    }
+    const cleanReason =
+      typeof reason === "string" && reason.trim() ? reason.trim().slice(0, 500) : null;
 
-    // ── Refund deposit via Stripe ────────────────────────────
-    let refunded = false;
-    if (order.stripe_payment_intent_id && order.status !== "pending") {
-      try {
-        await stripe.refunds.create({
-          payment_intent: order.stripe_payment_intent_id,
-        });
-        refunded = true;
-      } catch (refundErr) {
-        console.error("Stripe refund error:", refundErr.message);
-        // If refund fails (e.g. already refunded), continue with cancellation
-        if (refundErr.code === "charge_already_refunded") {
-          refunded = true;
-        } else {
-          return res.status(500).json({
-            error: "Refund failed. Please contact support@roomonyc.com",
-          });
+    // ── UNPAID: cancel immediately (nothing was charged) ──────
+    if (order.status === "pending") {
+      const { error: updErr, count } = await supabase
+        .from("orders")
+        .update(
+          { status: "cancelled", cancelled_at: new Date().toISOString() },
+          { count: "exact" }
+        )
+        .eq("id", order.id)
+        .eq("status", "pending");
+
+      if (updErr) throw new Error(`update order: ${updErr.message}`);
+      if (count === 0) {
+        return res
+          .status(409)
+          .json({ error: "Order status changed — please refresh and try again." });
+      }
+
+      // Cancel the still-open (unpaid) deposit PaymentIntent, best-effort.
+      if (order.stripe_payment_intent_id) {
+        try {
+          await stripe.paymentIntents.cancel(order.stripe_payment_intent_id);
+        } catch (piErr) {
+          console.error("Cancel unpaid PI (non-fatal):", piErr.message);
         }
       }
+
+      try {
+        await sendCancellationEmail({
+          email: customer.email,
+          name: customer.name,
+          order,
+          refunded: false,
+        });
+      } catch (emailErr) {
+        console.error("Cancellation email failed (non-fatal):", emailErr);
+      }
+
+      return res.status(200).json({
+        success: true,
+        mode: "cancelled",
+        message: "Your order has been cancelled.",
+      });
     }
 
-    // ── Update order status (with optimistic lock) ─────────────
-    const { error: updateErr, count: updateCount } = await supabase
+    // ── PAID (deposit_paid / authorized): file a refund REQUEST ──
+    if (order.refund_requested_at) {
+      return res.status(200).json({
+        success: true,
+        mode: "already_requested",
+        message: "We already have your refund request and are reviewing it.",
+      });
+    }
+
+    const { error: reqErr, count: reqCount } = await supabase
       .from("orders")
       .update(
         {
-          status: "cancelled",
-          cancelled_at: new Date().toISOString(),
+          refund_requested_at: new Date().toISOString(),
+          refund_request_reason: cleanReason,
         },
         { count: "exact" }
       )
       .eq("id", order.id)
-      .in("status", cancellable);
+      .in("status", ["deposit_paid", "authorized"])
+      .is("refund_requested_at", null);
 
-    if (!updateErr && updateCount === 0) {
-      return res.status(409).json({
-        error: "Order status changed — please refresh and try again.",
+    if (reqErr) throw new Error(`file request: ${reqErr.message}`);
+    if (reqCount === 0) {
+      // Someone/something changed it between read and write.
+      return res.status(200).json({
+        success: true,
+        mode: "already_requested",
+        message: "We already have your refund request and are reviewing it.",
       });
     }
 
-    if (updateErr) throw new Error(`update order: ${updateErr.message}`);
-
-    // ── Release pre-auth hold if present ────────────────────
-    // Re-fetch to get the latest stripe_auth_pi_id in case the cron
-    // added one between our initial fetch and the status update above.
-    const { data: freshOrder } = await supabase
-      .from("orders")
-      .select("stripe_auth_pi_id")
-      .eq("id", order.id)
-      .single();
-
-    const authPiId = freshOrder?.stripe_auth_pi_id || order.stripe_auth_pi_id;
-    if (authPiId) {
-      try {
-        await stripe.paymentIntents.cancel(authPiId);
-      } catch (authErr) {
-        console.error("Cancel pre-auth error (non-fatal):", authErr.message);
-      }
-    }
-
-    // ── Record cancellation in payments ledger ───────────────
-    if (refunded) {
-      await supabase.from("payments").insert({
-        order_id: order.id,
-        type: "refund",
-        amount_cents: -(order.deposit_cents || 2500), // negative = money returned
-        stripe_payment_intent_id: order.stripe_payment_intent_id,
-        status: "succeeded",
-        description: "Deposit refunded — order cancelled by customer",
-      });
-    }
-
-    // ── Send cancellation confirmation email ─────────────────
+    // Notify the team (non-fatal)
     try {
-      await sendCancellationEmail({
-        email: customer.email,
-        name: customer.name,
-        order,
-        refunded,
-      });
+      await sendRefundRequestNotification({ order, customer, reason: cleanReason });
     } catch (emailErr) {
-      console.error("Cancellation email failed (non-fatal):", emailErr);
+      console.error("Refund-request notification failed (non-fatal):", emailErr);
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      refunded,
-      message: refunded
-        ? "Order cancelled and deposit refunded."
-        : "Order cancelled.",
+      mode: "requested",
+      message:
+        "Your refund request has been received. Our team will review and process it, and you'll get an email confirmation.",
     });
   } catch (err) {
     console.error("cancel-order error:", err);

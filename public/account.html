@@ -1067,7 +1067,7 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
         </div>
         <div style="font-family:var(--font-heading);font-weight:700;font-size:20px;color:var(--text-primary);margin-bottom:var(--space-sm)">Cancel your order?</div>
         <p style="font-size:14px;color:#816E68;line-height:1.6;margin-bottom:var(--space-lg)">
-          This will cancel your delivery and refund your $25 deposit. The refund typically takes 5–10 business days to appear.
+          If your order isn't paid yet, it'll be cancelled right away. If you've already paid the $25 deposit, we'll submit a refund request and our team will review and process it — you'll get an email confirmation.
         </p>
       </div>
       <div class="modal-actions">
@@ -1080,8 +1080,8 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
         <div style="width:64px;height:64px;margin:0 auto var(--space-lg);background:var(--bg-secondary);border-radius:50%;display:flex;align-items:center;justify-content:center">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent-olive)" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
         </div>
-        <div style="font-family:var(--font-heading);font-weight:700;font-size:22px;color:var(--text-primary);margin-bottom:var(--space-sm)">Order Cancelled</div>
-        <p style="font-size:14px;color:#816E68;margin-bottom:var(--space-lg);line-height:1.6">Your $25 deposit will be refunded in 5–10 business days. A confirmation email has been sent.</p>
+        <div id="cancelStep2Title" style="font-family:var(--font-heading);font-weight:700;font-size:22px;color:var(--text-primary);margin-bottom:var(--space-sm)">Request received</div>
+        <p id="cancelStep2Msg" style="font-size:14px;color:#816E68;margin-bottom:var(--space-lg);line-height:1.6">Our team will review and process your refund. A confirmation email has been sent.</p>
         <a class="btn btn-primary" href="#" onclick="closeCancelModal();window.location.reload();return false;">Done</a>
       </div>
     </div>
@@ -2354,6 +2354,19 @@ async function confirmCancelOrder() {
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || 'Cancellation failed');
+    // Tailor the success screen to what actually happened.
+    const titleEl = document.getElementById('cancelStep2Title');
+    const msgEl = document.getElementById('cancelStep2Msg');
+    if (data.mode === 'cancelled') {
+      titleEl.textContent = 'Order Cancelled';
+      msgEl.textContent = 'Your order has been cancelled. A confirmation email has been sent.';
+    } else if (data.mode === 'already_requested') {
+      titleEl.textContent = 'Request already received';
+      msgEl.textContent = data.message || 'We already have your refund request and are reviewing it.';
+    } else {
+      titleEl.textContent = 'Refund requested';
+      msgEl.textContent = data.message || 'Our team will review and process your refund. A confirmation email has been sent.';
+    }
     document.getElementById('cancelStep1').style.display='none';
     document.getElementById('cancelStep2').style.display='block';
   } catch(err) {
