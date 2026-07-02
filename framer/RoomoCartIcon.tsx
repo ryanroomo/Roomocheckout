@@ -1,4 +1,5 @@
 import * as React from "react"
+import { createPortal } from "react-dom"
 import { useState, useEffect, useRef } from "react"
 import { addPropertyControls, ControlType } from "framer"
 import { motion, AnimatePresence } from "framer-motion"
@@ -1669,34 +1670,40 @@ function StepPayment({
     couponCode: string
     onSuccess: () => void
 }) {
-    const total = cart.reduce((s, i) => s + i.price, 0)
-    const params = new URLSearchParams({
-        items: JSON.stringify(
-            cart.map((i) => ({
-                set: i.set,
-                palette: i.palette,
-                months: i.months,
-                price: i.price,
-                excluded: i.excluded,
-            }))
-        ),
-        email: address?.email || "",
-        name: `${address?.firstName || ""} ${address?.lastName || ""}`.trim(),
-        phone: address?.phone || "",
-        address: address?.address || "",
-        unit: address?.unit || "",
-        city: address?.city || "",
-        state: address?.state || "",
-        zip: address?.zip || "",
-        total: String(total),
-        deliveryFee: String(deliveryFee),
-        deliveryDate: deliveryDate || "",
-        deliverySlot: deliverySlot || "",
-        couponCode: couponCode || "",
+    // Build the checkout iframe URL ONCE, when the payment step first mounts.
+    // If we recomputed it from `cart` on every render, clearing the cart on
+    // success (setCart([])) would change the src → reload the iframe → wipe the
+    // "You're all set!" screen and spin up a second PaymentIntent. Freezing it
+    // with a lazy useState initializer prevents that.
+    const [iframeSrc] = useState(() => {
+        if (!checkoutBaseUrl) return ""
+        const total = cart.reduce((s, i) => s + i.price, 0)
+        const params = new URLSearchParams({
+            items: JSON.stringify(
+                cart.map((i) => ({
+                    set: i.set,
+                    palette: i.palette,
+                    months: i.months,
+                    price: i.price,
+                    excluded: i.excluded,
+                }))
+            ),
+            email: address?.email || "",
+            name: `${address?.firstName || ""} ${address?.lastName || ""}`.trim(),
+            phone: address?.phone || "",
+            address: address?.address || "",
+            unit: address?.unit || "",
+            city: address?.city || "",
+            state: address?.state || "",
+            zip: address?.zip || "",
+            total: String(total),
+            deliveryFee: String(deliveryFee),
+            deliveryDate: deliveryDate || "",
+            deliverySlot: deliverySlot || "",
+            couponCode: couponCode || "",
+        })
+        return `${checkoutBaseUrl}?${params.toString()}`
     })
-    const iframeSrc = checkoutBaseUrl
-        ? `${checkoutBaseUrl}?${params.toString()}`
-        : ""
 
     // Listen for payment success from iframe
     useEffect(() => {
@@ -2024,8 +2031,13 @@ function CartPanel({ checkoutBaseUrl }: { checkoutBaseUrl: string }) {
     }
 
     if (!isOwner) return null
+    if (typeof document === "undefined") return null
 
-    return (
+    // Render at document.body via a portal so the overlay escapes Framer's
+    // per-frame stacking contexts (transforms on ancestor frames otherwise trap
+    // our position:fixed panel, letting page elements like "WHAT'S INCLUDE"
+    // paint on top of it).
+    return createPortal(
         <AnimatePresence>
             {open && (
                 <>
@@ -2196,7 +2208,8 @@ function CartPanel({ checkoutBaseUrl }: { checkoutBaseUrl: string }) {
                     </motion.div>
                 </>
             )}
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
     )
 }
 
