@@ -1321,11 +1321,14 @@ function mapApiToBackend(api) {
   const setId = item.setType || 'living';
   const colorSlug = normalizeColorSlug(item.palette || 'hudson-haze');
   const months = item.months || 12;
-  const excluded = item.excluded || [];
+  // Framer stores excluded items capitalized ("Mattress", "Lamp", "Plant"),
+  // so match case-insensitively (and by keyword, e.g. "Floor Lamp").
+  const excludedLower = (item.excluded || []).map((x) => String(x).toLowerCase());
+  const hasExcluded = (kw) => excludedLower.some((x) => x.includes(kw));
   const omit = {
-    noLamp: excluded.includes('lamp'),
-    noPlant: excluded.includes('plant'),
-    noMattress: excluded.includes('mattress')
+    noLamp: hasExcluded('lamp'),
+    noPlant: hasExcluded('plant'),
+    noMattress: hasExcluded('mattress')
   };
 
   // Dates
@@ -1638,7 +1641,6 @@ function getIncludedItemsList(plan) {
   } else {
     items = ['Bed Frame'];
     if (!omit.noMattress) items.push('Mattress');
-    items.push('Pillows', 'Linens');
   }
   return items.join(' · ');
 }

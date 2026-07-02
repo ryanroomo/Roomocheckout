@@ -1,4 +1,5 @@
 import { supabase } from "../../../lib/supabase";
+import { verifyPortalToken } from "../../../lib/authToken";
 
 /**
  * GET /api/user/portal-status?token=<email-token>
@@ -130,22 +131,36 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { token } = req.query;
-  if (!token) {
-    return res.status(400).json({ error: "Missing token parameter" });
-  }
-
   try {
-    // Decode email from token (simple base64 for now)
-    let email;
-    try {
-      email = Buffer.from(token, "base64").toString("utf-8");
-    } catch {
-      return res.status(400).json({ error: "Invalid token" });
+    // Resolve the customer's email, most-secure source first:
+    //   1. Bearer JWT  → a real Supabase Auth session (preferred).
+    //   2. Signed token → the new unforgeable email link.
+    //   3. Legacy base64 token → old links (kept working during transition).
+    let email = null;
+
+    const authHeader = req.headers.authorization || "";
+    const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    if (bearer) {
+      const { data, error } = await supabase.auth.getUser(bearer);
+      if (!error && data?.user?.email) email = data.user.email;
+    }
+
+    const { token } = req.query;
+    if (!email && token) {
+      email = verifyPortalToken(token);
+      if (!email) {
+        // Legacy fallback: base64(email)
+        try {
+          const decoded = Buffer.from(token, "base64").toString("utf-8");
+          if (decoded.includes("@")) email = decoded;
+        } catch {
+          /* ignore */
+        }
+      }
     }
 
     if (!email || !email.includes("@")) {
-      return res.status(400).json({ error: "Invalid token" });
+      return res.status(401).json({ error: "Not authenticated" });
     }
 
     // Fetch customer

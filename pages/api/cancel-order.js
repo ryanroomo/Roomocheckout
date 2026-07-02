@@ -4,6 +4,7 @@ import {
   sendCancellationEmail,
   sendRefundRequestNotification,
 } from "../../lib/email";
+import { verifyPortalToken } from "../../lib/authToken";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2024-06-20",
@@ -53,12 +54,15 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Missing token" });
     }
 
-    // Decode email from token
-    let email;
-    try {
-      email = Buffer.from(token, "base64").toString("utf-8");
-    } catch {
-      return res.status(400).json({ error: "Invalid token" });
+    // Resolve email: signed token first, then legacy base64 fallback.
+    let email = verifyPortalToken(token);
+    if (!email) {
+      try {
+        const decoded = Buffer.from(token, "base64").toString("utf-8");
+        if (decoded.includes("@")) email = decoded;
+      } catch {
+        /* ignore */
+      }
     }
     if (!email || !email.includes("@")) {
       return res.status(400).json({ error: "Invalid token" });
