@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { supabase } from "../../lib/supabase";
 import { sendOrderConfirmation } from "../../lib/email";
+import { sendAlert } from "../../lib/notify";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2024-06-20",
@@ -133,26 +134,58 @@ export default async function handler(req, res) {
             }
           }
 
-          // Send confirmation email
+          // Fetch full order once for the confirmation email + founder alert
+          let fullOrder = null;
           try {
-            // Fetch full order + items + customer for the email
-            const { data: fullOrder } = await supabase
+            const { data } = await supabase
               .from("orders")
               .select("*, order_items(*), customers(*)")
               .eq("id", order.id)
               .single();
+            fullOrder = data;
+          } catch (fetchErr) {
+            console.error("Fetch full order (non-fatal):", fetchErr);
+          }
 
-            if (fullOrder?.customers?.email) {
+          // Send confirmation email to customer
+          if (fullOrder?.customers?.email) {
+            try {
               await sendOrderConfirmation({
                 email: fullOrder.customers.email,
                 name: fullOrder.customers.name,
                 order: fullOrder,
                 items: fullOrder.order_items || [],
               });
+            } catch (emailErr) {
+              // Email failure should NOT block the webhook response
+              console.error("Confirmation email failed (non-fatal):", emailErr);
             }
-          } catch (emailErr) {
-            // Email failure should NOT block the webhook response
-            console.error("Confirmation email failed (non-fatal):", emailErr);
+          }
+
+          // Founder alert — a new order was just paid for.
+          try {
+            const src = fullOrder || {};
+            const cust = src.customers || {};
+            const money = (c) => `$${((c || 0) / 100).toFixed(2)}`;
+            const items = (src.order_items || [])
+              .map((i) => {
+                const mode = i.mode === "rent" ? `${i.months}mo rent` : "buy";
+                return `• ${i.set_type} (${mode}) ${money(i.price_cents)}`;
+              })
+              .join("\n");
+            const lines = [
+              `Customer: ${cust.name || "—"} (${cust.email || "—"})`,
+              items || "• (items unavailable)",
+              src.rental_monthly_cents ? `Monthly rent: ${money(src.rental_monthly_cents)}/mo` : undefined,
+              src.buy_total_cents ? `Buy total: ${money(src.buy_total_cents)}` : undefined,
+              src.coupon_code ? `Coupon: ${src.coupon_code}` : undefined,
+              src.delivery_date ? `Delivery: ${src.delivery_date}${src.delivery_slot ? " · " + src.delivery_slot : ""}` : undefined,
+              `Paid now: ${money(pi.amount)} deposit`,
+              "Admin: https://checkout.roomonyc.com/admin.html",
+            ].filter(Boolean);
+            await sendAlert({ title: "🛎️ New Roomo order confirmed", lines });
+          } catch (alertErr) {
+            console.error("Order alert failed (non-fatal):", alertErr);
           }
         }
         break;
