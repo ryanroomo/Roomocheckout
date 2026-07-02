@@ -812,6 +812,7 @@ tbody tr:last-child td {
       <button class="topbar-tab active" data-tab="dashboard">Dashboard</button>
       <button class="topbar-tab" data-tab="orders">Orders</button>
       <button class="topbar-tab" data-tab="calendar">Calendar</button>
+      <button class="topbar-tab" data-tab="tools">Tools</button>
     </div>
     <button class="signout-btn" id="signOutBtn">Sign Out</button>
   </div>
@@ -926,6 +927,67 @@ tbody tr:last-child td {
         </div>
         <div class="calendar-body" id="calendarBody">
           <div class="spinner" style="grid-column: 1/-1;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tools -->
+    <div class="tab-panel" id="panel-tools">
+      <div class="section-card" style="margin-bottom:16px">
+        <h3 style="margin:0 0 4px">Portal preview (fake data)</h3>
+        <p style="color:var(--text-secondary);font-size:13px;margin:0 0 14px">Preview any status + configuration exactly as a customer would see it. No login, no real data.</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px">
+          <label style="font-size:12px;color:var(--text-secondary)">Status<select id="pvStatus" class="filter-select" style="width:100%;margin-top:4px">
+            <option value="1">1 · No order yet</option>
+            <option value="2">2 · Checkout incomplete</option>
+            <option value="3" selected>3 · Confirmed &amp; scheduled</option>
+            <option value="4">4 · Delivery within 48h</option>
+            <option value="5">5 · Active rental</option>
+            <option value="6">6 · Payment failed</option>
+            <option value="7">7 · Term ending soon</option>
+            <option value="8">8 · Return scheduled</option>
+            <option value="9">9 · Plan completed</option>
+            <option value="10">10 · Cancelled</option>
+          </select></label>
+          <label style="font-size:12px;color:var(--text-secondary)">Set<select id="pvSet" class="filter-select" style="width:100%;margin-top:4px">
+            <option value="living">Living</option><option value="dining">Dining</option><option value="bedding">Bedding</option>
+          </select></label>
+          <label style="font-size:12px;color:var(--text-secondary)">Color<select id="pvColor" class="filter-select" style="width:100%;margin-top:4px">
+            <option value="hudson">Hudson Haze</option><option value="soho">Soho Merlot</option><option value="moss">Central Moss</option><option value="carbon">Carbon Silence</option><option value="colorTheory">Color Theory</option><option value="almond">Almond Breeze</option>
+          </select></label>
+          <label style="font-size:12px;color:var(--text-secondary)">Months<select id="pvMonths" class="filter-select" style="width:100%;margin-top:4px">
+            <option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option><option selected>12</option>
+          </select></label>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;font-size:13px;color:var(--text)">
+          <label><input type="checkbox" id="pvMattress" checked> Mattress (bedding)</label>
+          <label><input type="checkbox" id="pvLamp" checked> Floor lamp (living)</label>
+          <label><input type="checkbox" id="pvPlant" checked> Plant (living/dining)</label>
+        </div>
+        <button id="pvOpen" class="btn-primary" style="padding:10px 22px;border-radius:8px;border:none;background:var(--text);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Open preview →</button>
+        <div style="margin-top:16px">
+          <div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px">Quick jump to any status (uses the config above):</div>
+          <div id="pvQuick" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <h3 style="margin:0 0 4px">Customer portal links</h3>
+        <p style="color:var(--text-secondary);font-size:13px;margin:0 0 14px">Generate a real signed link for any customer email — to test the login/onboarding flow, or to view their live portal read-only.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+          <input id="plEmail" class="search-input" type="email" placeholder="customer@email.com" style="flex:1;min-width:220px">
+          <button id="plGen" class="btn-primary" style="padding:9px 20px;border-radius:8px;border:none;background:var(--text);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Generate</button>
+        </div>
+        <div id="plErr" style="display:none;font-size:13px;color:var(--red);background:var(--red-bg);border-radius:8px;padding:8px 12px;margin-bottom:10px"></div>
+        <div id="plResult" style="display:none">
+          <div style="margin-bottom:10px">
+            <div style="font-size:12px;font-weight:700;color:var(--text)">Test login link <span style="font-weight:400;color:var(--text-secondary)">(real login + onboarding)</span></div>
+            <a id="plLogin" href="#" target="_blank" style="font-size:12px;color:#4A7C59;word-break:break-all"></a>
+          </div>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--text)">View as customer <span style="font-weight:400;color:var(--text-secondary)">(read-only, live data)</span></div>
+            <a id="plView" href="#" target="_blank" style="font-size:12px;color:#4A7C59;word-break:break-all"></a>
+          </div>
         </div>
       </div>
     </div>
@@ -1822,6 +1884,53 @@ setInterval(() => {
   const dashPanel = document.getElementById('panel-dashboard');
   if (dashPanel && dashPanel.classList.contains('active')) loadDashboard();
 }, 20000);
+
+// ─── Tools tab: portal preview + customer links ───
+function _pvLink() {
+  var p = new URLSearchParams();
+  p.set('status', document.getElementById('pvStatus').value);
+  p.set('set', document.getElementById('pvSet').value);
+  p.set('color', document.getElementById('pvColor').value);
+  p.set('months', document.getElementById('pvMonths').value);
+  p.set('mattress', document.getElementById('pvMattress').checked ? '1' : '0');
+  p.set('lamp', document.getElementById('pvLamp').checked ? '1' : '0');
+  p.set('plant', document.getElementById('pvPlant').checked ? '1' : '0');
+  return '/account.html?' + p.toString();
+}
+document.getElementById('pvOpen').addEventListener('click', function(){ window.open(_pvLink(), '_blank'); });
+(function(){
+  var wrap = document.getElementById('pvQuick');
+  var labels = ['','No order','Checkout','Confirmed','48h','Active','Failed','Ending','Return','Completed','Cancelled'];
+  for (var i=1;i<=10;i++){
+    (function(n){
+      var b=document.createElement('button');
+      b.textContent=n+' · '+labels[n];
+      b.style.cssText='padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:#fff;color:var(--text);font-family:inherit;font-size:12px;cursor:pointer';
+      b.addEventListener('click', function(){ document.getElementById('pvStatus').value=String(n); window.open(_pvLink(),'_blank'); });
+      wrap.appendChild(b);
+    })(i);
+  }
+})();
+document.getElementById('plGen').addEventListener('click', async function(){
+  var email = document.getElementById('plEmail').value.trim();
+  document.getElementById('plErr').style.display='none';
+  document.getElementById('plResult').style.display='none';
+  if (!email || email.indexOf('@')<0) { var e=document.getElementById('plErr'); e.textContent='Enter a valid email.'; e.style.display='block'; return; }
+  this.textContent='...'; this.disabled=true;
+  try {
+    var r = await fetch('/api/admin/portal-link', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+getPassword() },
+      body: JSON.stringify({ email: email })
+    });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Failed');
+    var lg=document.getElementById('plLogin'); lg.href=d.loginLink; lg.textContent=d.loginLink;
+    var vw=document.getElementById('plView'); vw.href=d.viewLink; vw.textContent=d.viewLink;
+    document.getElementById('plResult').style.display='block';
+  } catch(err){ var e2=document.getElementById('plErr'); e2.textContent=err.message; e2.style.display='block'; }
+  this.textContent='Generate'; this.disabled=false;
+});
 
 // ─── Init ───
 if (getPassword()) {

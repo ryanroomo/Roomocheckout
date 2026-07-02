@@ -3041,9 +3041,84 @@ switchStatus(_initStatus);
   window.__hideLogin = function(){ hide('authLogin'); };
   window.__showOnboard = function(email){ orderEmail = email; show('authOnboard'); };
 
+  // ── Preview sandbox: render any status + config with fake data (no login) ──
+  function _tierPrice(set, m, noMat){
+    var T={living:[[10,12,349],[7,9,449],[4,6,549]],dining:[[10,12,249],[7,9,349],[4,6,449]],bedding:[[10,12,199],[7,9,239],[4,6,319]]};
+    var rows=T[set]||T.living, base=rows[0][2];
+    for(var i=0;i<rows.length;i++){ if(m>=rows[i][0] && m<=rows[i][1]){ base=rows[i][2]; break; } }
+    if(set==='bedding' && noMat) base-=70;
+    return base;
+  }
+  function buildPreviewData(p){
+    var status=parseInt(p.get('status')||'5',10);
+    var set=p.get('set')||'living';
+    var color=p.get('color')||'hudson';
+    var months=parseInt(p.get('months')||'12',10);
+    var excluded=[];
+    if(p.get('mattress')==='0') excluded.push('Mattress');
+    if(p.get('lamp')==='0') excluded.push('Lamp');
+    if(p.get('plant')==='0') excluded.push('Plant');
+    var monthly=_tierPrice(set,months,excluded.indexOf('Mattress')>=0);
+    var now=new Date();
+    function plus(days){ var d=new Date(now); d.setDate(d.getDate()+days); return d.toISOString(); }
+    var payments=[];
+    if(status>=3) payments.push({type:'deposit',amount:25,status:'succeeded',date:plus(-30),description:'Deposit'});
+    if(status>=5 && status!==6){ payments.push({type:'pre_auth_capture',amount:monthly*2,status:'succeeded',date:plus(-26),description:'1st month + deposit'}); payments.push({type:'subscription',amount:monthly,status:'succeeded',date:plus(4),description:'Monthly rent'}); }
+    if(status===6) payments.push({type:'subscription',amount:monthly,status:'failed',date:plus(2),description:'Monthly rent failed'});
+    return {
+      step: status,
+      customer: { name:'Preview Customer', email:'preview@roomonyc.com' },
+      order: { id:'preview', status:'active', deliveryDate:plus(5), deliverySlot:'10:00 AM – 2:00 PM', monthlyRent:monthly, buyTotal:0, securityDeposit:monthly, subscriptionEndsAt:plus(months*30-30), returnDate:plus(months*30-25), createdAt:plus(-30), deliveryStreet:'123 Preview St', deliveryUnit:'4B', deliveryCity:'New York', deliveryState:'NY', deliveryZip:'10001' },
+      items: [{ setType:set, mode:'rent', palette:color, months:months, pricePerMonth:monthly, excluded:excluded }],
+      payments: payments,
+      buyout: null
+    };
+  }
+  function applyPreview(p){
+    try {
+      var data=buildPreviewData(p);
+      _apiData=data;
+      BACKEND=mapApiToBackend(data);
+      CONFIRMED_PLAN={ setId:BACKEND.plan.setId, colorSlug:BACKEND.plan.colorSlug, months:BACKEND.plan.months, omit:BACKEND.plan.omit };
+      demoPlan={ setId:BACKEND.plan.setId, colorSlug:BACKEND.plan.colorSlug, months:6, omit:BACKEND.plan.omit };
+      var mF=['January','February','March','April','May','June','July','August','September','October','November','December'];
+      var dN=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      if(data.order.deliveryDate){ var dd=new Date(data.order.deliveryDate); window._deliveryDate={dateMain:mF[dd.getMonth()]+' '+dd.getDate(), year:dd.getFullYear().toString(), dayName:dN[dd.getDay()], slot:data.order.deliverySlot}; }
+      if(data.order.returnDate){ var rd=new Date(data.order.returnDate); window._returnPickup={dateMain:mF[rd.getMonth()]+' '+rd.getDate(), year:rd.getFullYear().toString(), dayName:dN[rd.getDay()], slot:'9:00 AM – 1:00 PM'}; }
+      currentStatus=data.step;
+      var sn=document.getElementById('sidebarName'), se=document.getElementById('sidebarEmail');
+      if(sn) sn.textContent=BACKEND.user.name; if(se) se.textContent=BACKEND.user.email;
+      renderHero(currentStatus); renderContent(currentStatus, currentTab);
+      document.body.classList.remove('page-loading');
+    } catch(e){ console.error('preview error', e); document.body.classList.remove('page-loading'); }
+  }
+
+  // ── Read-only "view as customer": real data via token, all actions no-op ──
+  function makeReadOnly(){
+    window.__readonly=true;
+    var fns=['openCancelModal','confirmCancelOrder','openReschedule','confirmReschedule','openAddressModal','saveAddress','openPaymentModal','submitPayment','openMakePaymentModal','openEndTermEarlyModal','openEndOfTermModal','openConfirmDeliveryModal','openConfirmReturnModal','openCheckoutModal','openRenewModal','openTryAgainModal','openEditTermModal'];
+    fns.forEach(function(fn){ try { if(typeof window[fn]==='function'){ window[fn]=function(){ return false; }; } } catch(e){} });
+    var b=document.createElement('div');
+    b.textContent='Read-only preview (admin) — actions disabled';
+    b.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#49372A;color:#F9F5F1;text-align:center;font:600 12px/2.4 "Trebuchet MS",Arial,sans-serif;';
+    if(document.body) document.body.appendChild(b);
+  }
+
   async function boot(){
     var params = new URLSearchParams(location.search);
-    if (params.has('demo') || params.has('status')) return; // demo mode untouched
+
+    // Preview sandbox — any status + config, fake data, no login.
+    if (params.has('status') || params.has('preview')) { applyPreview(params); return; }
+    if (params.has('demo')) return; // legacy demo, untouched
+
+    // Read-only "view as customer" (admin) — real data via signed token, no
+    // session; every customer action is disabled.
+    if (params.has('readonly')) {
+      makeReadOnly();
+      loadPortalData(null); // reads ?token= from the URL
+      setTimeout(function(){ try { history.replaceState(null,'',location.pathname+'?readonly=1'); } catch(e){} }, 60);
+      return;
+    }
 
     document.body.classList.add('page-loading');
 
