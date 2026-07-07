@@ -1511,6 +1511,10 @@ function renderOrderActions(o) {
   if (!canCancel && !canRefund) return '';
 
   let btns = '';
+  if (o.status === 'authorized') {
+    const amt = o.authorizedAmountCents != null ? formatCurrency(o.authorizedAmountCents) : '';
+    btns += `<button onclick="captureOrder('${o.id}')" style="padding:8px 20px;border-radius:8px;border:none;background:#4A7C59;color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;margin-left:8px">Confirm delivery &amp; capture ${amt}</button>`;
+  }
   if (canRefund) {
     const fallback = o.status === 'cancelled';
     const label = fallback ? 'Refund $25 (fallback)' : 'Refund $25 deposit';
@@ -1520,6 +1524,27 @@ function renderOrderActions(o) {
     btns += `<button onclick="openAdminCancelModal('${o.id}')" style="padding:8px 20px;border-radius:8px;border:1.5px solid var(--red);background:transparent;color:var(--red);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s" onmouseover="this.style.background='var(--red)';this.style.color='#fff'" onmouseout="this.style.background='transparent';this.style.color='var(--red)'">Cancel This Order</button>`;
   }
   return `<div style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:16px;margin-top:8px;text-align:right">${btns}</div>`;
+}
+
+// Capture the pre-auth on delivery: charges the customer, starts the rental
+// subscription (if any), and marks the order delivered/active.
+async function captureOrder(orderId) {
+  const o = ordersData.find(function(x){ return x.id === orderId; });
+  const amt = (o && o.authorizedAmountCents != null) ? formatCurrency(o.authorizedAmountCents) : 'the authorized amount';
+  if (!confirm('Confirm delivery and CAPTURE ' + amt + '?\n\nThis charges the customer now, starts their monthly rental subscription (for rentals), and marks the order delivered. It cannot be undone.')) return;
+  try {
+    const r = await fetch('/api/admin/capture', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getPassword() },
+      body: JSON.stringify({ orderId: orderId })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Capture failed');
+    alert('Captured ' + amt + '. Order is now "' + (d.status || 'delivered') + '".');
+    loadOrders(); loadDashboard();
+  } catch (e) {
+    alert('Capture failed: ' + e.message);
+  }
 }
 
 function renderOrderDetail(o) {

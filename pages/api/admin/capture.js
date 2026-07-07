@@ -16,16 +16,24 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2024-06-20",
 });
 
-// Simple admin auth — check a shared secret.
-// Replace with proper auth (e.g. Supabase Auth, session token) in production.
+function setCors(res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+}
+
+// Accept the admin-panel password (ADMIN_PASSWORD) or a legacy ADMIN_SECRET.
 function verifyAdmin(req) {
-  if (process.env.ADMIN_SECRET) {
-    return req.headers.authorization === `Bearer ${process.env.ADMIN_SECRET}`;
-  }
-  return process.env.NODE_ENV !== "production";
+  const pw = (req.headers.authorization || "").replace("Bearer ", "");
+  return (
+    !!pw &&
+    (pw === process.env.ADMIN_PASSWORD || pw === process.env.ADMIN_SECRET)
+  );
 }
 
 export default async function handler(req, res) {
+  setCors(res);
+  if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
