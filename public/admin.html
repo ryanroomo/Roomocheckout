@@ -1618,7 +1618,13 @@ async function completeReturn(orderId) {
 }
 
 function renderOrderDetail(o) {
-  const address = o.deliveryAddress || '—';
+  // Full delivery address including unit/apt, city, state, zip.
+  const address = [
+    o.deliveryAddress,
+    o.deliveryUnit ? ('Unit ' + o.deliveryUnit) : '',
+    [o.deliveryCity, o.deliveryState].filter(Boolean).join(', '),
+    o.deliveryZip
+  ].filter(Boolean).join(', ') || '—';
   const phone = o.customer?.phone || '—';
 
   let itemsHtml = '';
@@ -1780,7 +1786,12 @@ function openDayModal(dateStr) {
     let html = '';
     deliveries.forEach(o => {
       const name = o.customer ? escapeHtml(o.customer.name) : 'Unknown';
-      const address = o.deliveryAddress || 'No address';
+      const address = [
+        o.deliveryAddress,
+        o.deliveryUnit ? ('Unit ' + o.deliveryUnit) : '',
+        [o.deliveryCity, o.deliveryState].filter(Boolean).join(', '),
+        o.deliveryZip
+      ].filter(Boolean).join(', ') || 'No address';
       const slot = o.deliverySlot || 'No time slot';
       html += `<div class="delivery-card">
         <div class="delivery-card-name">${name}</div>
