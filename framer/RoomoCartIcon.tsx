@@ -108,8 +108,26 @@ const C = {
 const font = "'Manrope', 'League Spartan', sans-serif"
 
 function trackEvent(name: string, params?: Record<string, any>) {
-    if (typeof window !== "undefined" && (window as any).gtag) {
+    if (typeof window === "undefined") return
+    // GA4
+    if ((window as any).gtag) {
         ;(window as any).gtag("event", name, params)
+    }
+    // Meta Pixel — map our events to Meta standard events
+    const fbq = (window as any).fbq
+    if (fbq) {
+        if (name === "add_to_cart") {
+            fbq("track", "AddToCart", {
+                value: Number(params?.price) || 0,
+                currency: "USD",
+                content_type: "product",
+                content_name: params?.set,
+            })
+        } else if (name === "check_zipcode") {
+            fbq("track", "InitiateCheckout", { currency: "USD" })
+        } else if (name === "newsletter_signup") {
+            fbq("track", "Lead", { content_name: "newsletter" })
+        }
     }
 }
 
@@ -1709,12 +1727,20 @@ function StepPayment({
     useEffect(() => {
         const handler = (e: MessageEvent) => {
             if (e.data?.type === "roomo-payment-success") {
+                const fbq = (window as any).fbq
+                if (fbq) {
+                    const val = cart.reduce(
+                        (s, i) => s + (Number(i.price) || 0),
+                        0
+                    )
+                    fbq("track", "Purchase", { value: val, currency: "USD" })
+                }
                 onSuccess()
             }
         }
         window.addEventListener("message", handler)
         return () => window.removeEventListener("message", handler)
-    }, [onSuccess])
+    }, [onSuccess, cart])
 
     return (
         <div

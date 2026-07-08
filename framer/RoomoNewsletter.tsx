@@ -14,8 +14,14 @@ const API_URL = "https://roomocheckout.vercel.app/api/newsletter-subscribe"
 type Status = "idle" | "sending" | "success" | "error"
 
 function trackEvent(name: string, params?: Record<string, any>) {
-    if (typeof window !== "undefined" && (window as any).gtag) {
+    if (typeof window === "undefined") return
+    if ((window as any).gtag) {
         ;(window as any).gtag("event", name, params)
+    }
+    // Meta Pixel — newsletter signup = Lead
+    const fbq = (window as any).fbq
+    if (fbq && name === "newsletter_signup") {
+        fbq("track", "Lead", { content_name: "newsletter" })
     }
 }
 

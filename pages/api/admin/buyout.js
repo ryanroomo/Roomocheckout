@@ -27,10 +27,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 });
 
 function verifyAdmin(req) {
-  if (process.env.ADMIN_SECRET) {
-    return req.headers.authorization === `Bearer ${process.env.ADMIN_SECRET}`;
-  }
-  return process.env.NODE_ENV !== "production";
+  const pw = (req.headers.authorization || "").replace("Bearer ", "");
+  return !!pw && (pw === process.env.ADMIN_PASSWORD || pw === process.env.ADMIN_SECRET);
 }
 
 // ── Price tables (must match Framer RoomoCart.tsx) ────────────

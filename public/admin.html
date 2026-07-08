@@ -1508,7 +1508,6 @@ function renderOrderActions(o) {
   // Refund: standalone on deposit_paid, or fallback on a cancelled order whose
   // auto-refund never went through. Hidden once a refund has succeeded.
   const canRefund = !refunded && (o.status === 'deposit_paid' || o.status === 'cancelled');
-  if (!canCancel && !canRefund) return '';
 
   let btns = '';
   if (o.status === 'authorized') {
@@ -1523,7 +1522,14 @@ function renderOrderActions(o) {
   if (canCancel) {
     btns += `<button onclick="openAdminCancelModal('${o.id}')" style="padding:8px 20px;border-radius:8px;border:1.5px solid var(--red);background:transparent;color:var(--red);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s" onmouseover="this.style.background='var(--red)';this.style.color='#fff'" onmouseout="this.style.background='transparent';this.style.color='var(--red)'">Cancel This Order</button>`;
   }
-  return `<div style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:16px;margin-top:8px;text-align:right">${btns}</div>`;
+  if (o.status === 'active') {
+    btns += `<button onclick="scheduleReturn('${o.id}')" style="padding:8px 20px;border-radius:8px;border:1.5px solid var(--text-secondary);background:transparent;color:var(--text);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;margin-left:8px">Schedule return</button>`;
+    btns += `<button onclick="buyoutOrder('${o.id}')" style="padding:8px 20px;border-radius:8px;border:1.5px solid var(--text-secondary);background:transparent;color:var(--text);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;margin-left:8px">Buy-out (customer keeps it)</button>`;
+  }
+  if (o.status === 'return_scheduled') {
+    btns += `<button onclick="completeReturn('${o.id}')" style="padding:8px 20px;border-radius:8px;border:none;background:#4A7C59;color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;margin-left:8px">Complete return &amp; refund deposit</button>`;
+  }
+  return btns ? `<div style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:16px;margin-top:8px;text-align:right">${btns}</div>` : '';
 }
 
 // Capture the pre-auth on delivery: charges the customer, starts the rental
@@ -1545,6 +1551,70 @@ async function captureOrder(orderId) {
   } catch (e) {
     alert('Capture failed: ' + e.message);
   }
+}
+
+// Schedule the end-of-term furniture pickup.
+async function scheduleReturn(orderId) {
+  const d = prompt('Schedule furniture pickup date (YYYY-MM-DD):');
+  if (!d) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) { alert('Please use the format YYYY-MM-DD.'); return; }
+  try {
+    const r = await fetch('/api/admin/schedule-return', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getPassword() },
+      body: JSON.stringify({ orderId: orderId, returnDate: d })
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'Failed');
+    alert('Return scheduled for ' + d + '.');
+    loadOrders(); loadDashboard();
+  } catch (e) { alert('Failed: ' + e.message); }
+}
+
+// Rent-to-own: charge the buyout difference so the customer keeps the furniture.
+async function buyoutOrder(orderId) {
+  try {
+    const q = await fetch('/api/admin/buyout?orderId=' + encodeURIComponent(orderId), {
+      headers: { 'Authorization': 'Bearer ' + getPassword() }
+    });
+    const quote = await q.json();
+    if (!q.ok) throw new Error(quote.error || 'Quote failed');
+    const due = formatCurrency(quote.buyoutAmount);
+    if (!confirm(
+      'Buy-out: charge the customer ' + due + ' to own the furniture?\n\n' +
+      'Buy price ' + formatCurrency(quote.totalBuyPrice) + ' − paid ' + formatCurrency(quote.totalPaid) +
+      ' − deposit ' + formatCurrency(quote.securityDeposit) + '\n\n' +
+      'This cancels their rental subscription and marks the order owned.'
+    )) return;
+    const r = await fetch('/api/admin/buyout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getPassword() },
+      body: JSON.stringify({ orderId: orderId })
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'Buy-out failed');
+    alert('Buy-out complete. Charged ' + formatCurrency(j.charged || 0) + '.');
+    loadOrders(); loadDashboard();
+  } catch (e) { alert('Buy-out failed: ' + e.message); }
+}
+
+// Furniture picked up: refund the security deposit (minus any damage) and complete.
+async function completeReturn(orderId) {
+  const ded = prompt('Complete return. Damage deduction from the security deposit? Enter dollars (0 for none):', '0');
+  if (ded === null) return;
+  const deductionCents = Math.max(0, Math.round((parseFloat(ded) || 0) * 100));
+  if (!confirm('Complete return and refund the security deposit' + (deductionCents > 0 ? (' minus ' + formatCurrency(deductionCents) + ' damage') : '') + '?')) return;
+  try {
+    const r = await fetch('/api/admin/complete-return', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getPassword() },
+      body: JSON.stringify({ orderId: orderId, refundDeposit: true, deductionCents: deductionCents })
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'Failed');
+    alert('Return completed. Refunded ' + formatCurrency(j.depositRefunded || 0) + '.');
+    loadOrders(); loadDashboard();
+  } catch (e) { alert('Failed: ' + e.message); }
 }
 
 function renderOrderDetail(o) {
