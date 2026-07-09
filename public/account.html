@@ -412,6 +412,10 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
         Support
       </li>
+      <li class="nav-item" data-tab="account" onclick="switchTab('account')">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 016-6h4a6 6 0 016 6v1"/></svg>
+        Account
+      </li>
     </ul>
     <div class="sidebar-user">
       <div class="sidebar-user-divider"></div>
@@ -1856,8 +1860,65 @@ function renderContent(s, tab) {
     else area.innerHTML=`<div class="cards-grid"><div class="card card-plan-h card-full animate-in">${planImageBlock(s)}<div class="plan-content"><div class="card-header"><span class="card-title">${setLabel(CONFIRMED_PLAN.setId)} Set</span><span class="card-badge ${s===9?'badge-completed':'badge-active'}">${s===9?'Completed':'Active'}</span></div><div style="margin-bottom:var(--space-md)"><div style="font-family:var(--font-heading);font-weight:700;font-size:17px;color:var(--text-primary);margin-bottom:8px">${setLabel(CONFIRMED_PLAN.setId)} Set</div><div style="font-size:13px;color:#816E68">${colorDisplayName(CONFIRMED_PLAN.colorSlug)} · ${CONFIRMED_PLAN.months}-month rental</div></div><div style="border-top:1px solid var(--border-light);padding-top:var(--space-md)"><div class="card-row"><span class="card-row-label">Lease Start</span><span class="card-row-value">${BACKEND.lease.startDateFull}</span></div><div class="card-row"><span class="card-row-label">Lease End</span><span class="card-row-value">${BACKEND.lease.endDateFull}</span></div><div class="card-row"><span class="card-row-label">Monthly</span><span class="card-row-value">$${planMonthly(CONFIRMED_PLAN)} / month</span></div>${s===9?`<div class="card-row"><span class="card-row-label">Total Paid</span><span class="card-row-value">${BACKEND.billing.totalPaid}</span></div>`:''}</div><div style="border-top:1px solid var(--border-light);padding-top:var(--space-md);margin-top:var(--space-md)"><div class="card-row"><span class="card-row-label">Items</span><span class="card-row-value">${getIncludedItemsList(CONFIRMED_PLAN)}</span></div></div><div class="card-actions"><a class="btn btn-ghost" href="#" onclick="downloadReceipts();return false;">Download Receipts</a></div></div></div></div>`;
   } else if(tab==='support') {
     area.innerHTML=`<div style="text-align:center;max-width:520px;margin:0 auto;padding-top:var(--space-lg)"><h2 style="font-family:var(--font-heading);font-weight:700;font-size:24px;margin-bottom:var(--space-lg)">How can we help?</h2><p style="font-size:14px;color:#816E68;line-height:1.5;font-weight:400;margin-bottom:var(--space-lg)">Contact Roomo for delivery changes, billing questions, furniture care, swaps, returns, or general support.</p><a class="btn btn-primary" href="https://www.roomonyc.com/support" target="_blank">Contact Support</a><p style="font-size:12px;color:#816E68;margin-top:var(--space-sm);font-weight:400">hello@roomonyc.com</p></div>`;
+  } else if(tab==='account') {
+    const _email = (BACKEND.user && BACKEND.user.email) || '';
+    area.innerHTML = `<div class="cards-grid">
+      <div class="card card-full animate-in">
+        <div class="card-header"><span class="card-title">Login &amp; Security</span></div>
+        <div style="padding:8px 2px">
+          <div class="card-row"><span class="card-row-label">Email</span><span class="card-row-value">${_email || '—'}</span></div>
+          <div style="height:18px"></div>
+          <div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:8px">Set / change password</div>
+          <div id="acctMsg" style="display:none;font-size:13px;border-radius:8px;padding:8px 12px;margin-bottom:10px"></div>
+          <input id="acctNewPass" type="password" placeholder="New password (min 8 characters)" autocomplete="new-password" style="width:100%;box-sizing:border-box;height:44px;border:1.5px solid var(--border);border-radius:8px;padding:0 14px;font-family:var(--font-body);font-size:14px;color:var(--text-primary);outline:none;background:#fff;margin-bottom:10px">
+          <a class="btn btn-primary" href="#" onclick="acctSetPassword();return false;" style="width:auto">Save password</a>
+          <div style="height:22px"></div>
+          <div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:8px">Sign-in methods</div>
+          <p style="font-size:12px;color:#816E68;margin:0 0 10px;line-height:1.5">Link your Google account so you can sign in with one click.</p>
+          <a class="btn btn-ghost" href="#" onclick="acctLinkGoogle();return false;" style="width:auto">Link Google account</a>
+        </div>
+      </div>
+      <div class="card card-full animate-in">
+        <div class="card-header"><span class="card-title">Session</span></div>
+        <div style="padding:8px 2px">
+          <p style="font-size:13px;color:var(--text-secondary);line-height:1.6;margin:0 0 14px">Signed in as ${_email || 'your account'}.</p>
+          <a class="btn btn-ghost" href="#" onclick="acctLogout();return false;" style="width:auto;border-color:#a03020;color:#a03020">Log out</a>
+        </div>
+      </div>
+    </div>`;
   }
   document.getElementById('billingBadge').style.display = (s===6)?'inline':'none';
+}
+function acctShowMsg(text, ok) {
+  var el = document.getElementById('acctMsg');
+  if (!el) return;
+  el.textContent = text;
+  el.style.display = 'block';
+  el.style.background = ok ? '#E8F0E8' : '#FDF0F0';
+  el.style.color = ok ? '#4A7C59' : '#a03020';
+}
+async function acctSetPassword() {
+  var sb = window.__sb;
+  if (!sb) { acctShowMsg('You are not signed in.', false); return; }
+  var el = document.getElementById('acctNewPass');
+  var pass = el ? el.value : '';
+  if (!pass || pass.length < 8) { acctShowMsg('Password must be at least 8 characters.', false); return; }
+  try {
+    var r = await sb.auth.updateUser({ password: pass });
+    if (r.error) acctShowMsg(r.error.message, false);
+    else { acctShowMsg('Password saved. You can now log in with email + password.', true); if (el) el.value = ''; }
+  } catch (e) { acctShowMsg(e.message || 'Something went wrong.', false); }
+}
+function acctLinkGoogle() {
+  var sb = window.__sb;
+  if (!sb) { acctShowMsg('You are not signed in.', false); return; }
+  sb.auth.linkIdentity({ provider: 'google', options: { redirectTo: location.origin + location.pathname } });
+}
+async function acctLogout() {
+  var sb = window.__sb;
+  try { if (sb) await sb.auth.signOut(); } catch (e) {}
+  try { window.__accessToken = null; } catch (e) {}
+  location.href = location.origin + location.pathname; // back to login screen
 }
 function openReschedule() {
   // Set calendar to delivery date month, or next month from today
