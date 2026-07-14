@@ -111,17 +111,12 @@ function deriveStep(customer, order) {
     return { step: 9, label: "Plan completed" };
   }
 
-  // ⑩ Cancelled
-  if (s === "cancelled") {
-    return { step: 10, label: "Order cancelled", meta: { cancelled: true } };
+  // Cancelled or refunded → treat as "no active order" (not "ended/completed").
+  if (s === "cancelled" || s === "refunded") {
+    return { step: 1, label: "No active order" };
   }
 
-  // Fallback for refunded or unknown
-  if (s === "refunded") {
-    return { step: 9, label: "Plan completed", meta: { refunded: true } };
-  }
-
-  return { step: 1, label: "No order yet" };
+  return { step: 1, label: "No active order" };
 }
 
 export default async function handler(req, res) {
