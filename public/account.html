@@ -1872,16 +1872,8 @@ function renderContent(s, tab) {
         <div class="card-header"><span class="card-title">Login &amp; Security</span></div>
         <div style="padding:8px 2px">
           <div class="card-row"><span class="card-row-label">Email</span><span class="card-row-value">${_email || '—'}</span></div>
-          <div style="height:18px"></div>
-          <div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:8px">Set / change password</div>
-          <div id="acctMsg" style="display:none;font-size:13px;border-radius:8px;padding:8px 12px;margin-bottom:10px"></div>
-          <input id="acctNewPass" type="password" placeholder="New password (min 8 characters)" autocomplete="new-password" style="width:100%;box-sizing:border-box;height:44px;border:1.5px solid var(--border);border-radius:8px;padding:0 14px;font-family:var(--font-body);font-size:14px;color:var(--text-primary);outline:none;background:#fff;margin-bottom:10px">
-          <a class="btn btn-primary" href="#" onclick="acctSetPassword();return false;" style="width:auto">Save password</a>
-          <div style="height:22px"></div>
-          <div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:8px">Sign-in methods</div>
-          <div id="acctMethods" style="margin-bottom:10px"></div>
-          <p id="acctGoogleNote" style="font-size:12px;color:#816E68;margin:0 0 10px;line-height:1.5">Link your Google account so you can sign in with one click.</p>
-          <a id="acctGoogleBtn" class="btn btn-ghost" href="#" onclick="acctLinkGoogle();return false;" style="width:auto">Link Google account</a>
+          <div id="acctMsg" style="display:none;font-size:13px;border-radius:8px;padding:8px 12px;margin:14px 0 0"></div>
+          <div id="acctSecurityBody" style="margin-top:14px"><p style="font-size:13px;color:#816E68">Loading…</p></div>
         </div>
       </div>
       <div class="card card-full animate-in">
@@ -1896,28 +1888,62 @@ function renderContent(s, tab) {
   }
   document.getElementById('billingBadge').style.display = (s===6)?'inline':'none';
 }
-// Show which sign-in methods are connected (email / Google), hide Link if linked.
+// Build the Login & Security section based on which sign-in methods exist.
+function _acctPassBlock(label) {
+  return '<div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:8px">' + label + '</div>'
+    + '<input id="acctNewPass" type="password" placeholder="New password (min 8 characters)" autocomplete="new-password" style="width:100%;box-sizing:border-box;height:44px;border:1.5px solid var(--border);border-radius:8px;padding:0 14px;font-family:var(--font-body);font-size:14px;color:var(--text-primary);outline:none;background:#fff;margin-bottom:10px">'
+    + '<a class="btn btn-primary" href="#" onclick="acctSetPassword();return false;" style="width:auto">Save password</a>';
+}
 async function acctLoadMethods() {
   var sb = window.__sb;
-  var box = document.getElementById('acctMethods');
+  var box = document.getElementById('acctSecurityBody');
   if (!box || !sb) return;
+  var ids = [];
+  try {
+    var res = await sb.auth.getUserIdentities();
+    ids = (res && res.data && res.data.identities) || [];
+  } catch (e) { box.innerHTML = ''; return; }
+
+  var google = ids.find(function(i){ return i.provider === 'google'; });
+  var email = ids.find(function(i){ return i.provider === 'email'; });
+  var gEmail = (google && google.identity_data && google.identity_data.email) || '';
+  var html = '';
+
+  if (email && google) {
+    // Both methods
+    html = '<p style="font-size:13px;color:var(--text-secondary);line-height:1.6;margin:0 0 12px">You have <b>two ways to sign in</b> — email &amp; password, and Google. You can use either one, and manage them here.</p>'
+      + '<div class="card-row"><span class="card-row-label">Email &amp; password</span><span class="card-row-value">Connected</span></div>'
+      + '<div class="card-row"><span class="card-row-label">Google</span><span class="card-row-value">' + (gEmail || 'Connected') + '</span></div>'
+      + '<div style="height:18px"></div>' + _acctPassBlock('Change password')
+      + '<div style="height:18px"></div>'
+      + '<a class="btn btn-ghost" href="#" onclick="acctUnlinkGoogle();return false;" style="width:auto">Disconnect Google</a>';
+  } else if (google && !email) {
+    // Google only — offer a backup password
+    html = '<p style="font-size:13px;color:var(--text-secondary);line-height:1.6;margin:0 0 14px">You sign in with <b>Google</b>' + (gEmail ? (' (' + gEmail + ')') : '') + '. Add a password as a backup way to sign in.</p>'
+      + _acctPassBlock('Add a backup password');
+  } else {
+    // Email / password only — offer to link Google
+    html = '<p style="font-size:13px;color:var(--text-secondary);line-height:1.6;margin:0 0 14px">You sign in with <b>email &amp; password</b>.</p>'
+      + _acctPassBlock('Change password')
+      + '<div style="height:18px"></div>'
+      + '<p style="font-size:12px;color:#816E68;margin:0 0 10px;line-height:1.5">Link Google for one-click sign in.</p>'
+      + '<a class="btn btn-ghost" href="#" onclick="acctLinkGoogle();return false;" style="width:auto">Link Google account</a>';
+  }
+  box.innerHTML = html;
+}
+async function acctUnlinkGoogle() {
+  var sb = window.__sb;
+  if (!sb) return;
+  if (!confirm('Disconnect your Google account? You will sign in with email & password after this.')) return;
   try {
     var res = await sb.auth.getUserIdentities();
     var ids = (res && res.data && res.data.identities) || [];
-    var email = ids.find(function(i){ return i.provider === 'email'; });
-    var google = ids.find(function(i){ return i.provider === 'google'; });
-    var gEmail = google && google.identity_data ? google.identity_data.email : '';
-    var rows = '';
-    if (email) rows += '<div class="card-row"><span class="card-row-label">Email &amp; password</span><span class="card-row-value">Connected</span></div>';
-    if (google) rows += '<div class="card-row"><span class="card-row-label">Google</span><span class="card-row-value">' + (gEmail || 'Connected') + '</span></div>';
-    box.innerHTML = rows;
-    var btn = document.getElementById('acctGoogleBtn');
-    var note = document.getElementById('acctGoogleNote');
-    if (google) {
-      if (btn) btn.style.display = 'none';
-      if (note) note.textContent = 'Google is connected' + (gEmail ? (' (' + gEmail + ')') : '') + '.';
-    }
-  } catch (e) { /* ignore */ }
+    var g = ids.find(function(i){ return i.provider === 'google'; });
+    if (!g) return;
+    var r = await sb.auth.unlinkIdentity(g);
+    if (r && r.error) acctShowMsg(r.error.message, false);
+    else { acctShowMsg('Google disconnected.', true); acctLoadMethods(); }
+  } catch (e) { acctShowMsg(e.message || 'Could not disconnect Google.', false); }
 }
 function acctShowMsg(text, ok) {
   var el = document.getElementById('acctMsg');
