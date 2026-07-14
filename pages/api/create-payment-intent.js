@@ -40,7 +40,7 @@ export default async function handler(req, res) {
       couponCode = null,
     } = req.body;
 
-    if (!email || !address || !city || !state || !zip) {
+    if (!email || !address || !unit || !city || !state || !zip) {
       return res.status(400).json({ error: "Missing required customer/address fields" });
     }
 

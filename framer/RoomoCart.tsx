@@ -1611,7 +1611,7 @@ function StepAddress({
     })
     const s = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }))
     const ok =
-        f.firstName && f.email && f.address && f.city && f.zip.length === 5
+        f.firstName && f.email && f.address && f.unit && f.city && f.zip.length === 5
     const inp: React.CSSProperties = {
         width: "100%",
         padding: "11px 13px",
@@ -1709,7 +1709,7 @@ function StepAddress({
                 />
                 <input
                     style={inp}
-                    placeholder="Apt / Unit / Suite (optional)"
+                    placeholder="Apt / Unit / Suite"
                     value={f.unit}
                     onChange={(e) => s("unit", e.target.value)}
                 />
