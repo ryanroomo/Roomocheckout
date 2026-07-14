@@ -877,7 +877,7 @@ tbody tr:last-child td {
         <select class="filter-select" id="statusFilter">
           <option value="all">All Statuses</option>
           <option value="refund_requested">⚠ Refund requested</option>
-          <option value="pending">Pending</option>
+          <option value="pending">Incomplete (unpaid)</option>
           <option value="deposit_paid">Deposit Paid</option>
           <option value="authorized">Authorized</option>
           <option value="active">Active</option>
@@ -1142,6 +1142,8 @@ function statusBadgeClass(status) {
 }
 
 function statusLabel(status) {
+  // "pending" = an unpaid intent record (customer never paid the $25) → show as "Incomplete".
+  if (status === 'pending' || status === 'incomplete') return 'Incomplete';
   return (status || '').replace(/_/g, ' ');
 }
 

@@ -196,9 +196,13 @@ export default async function handler(req, res) {
       refunded: 12,
     };
 
-    const sorted = (orders || []).sort(
-      (a, b) => (priority[a.status] || 99) - (priority[b.status] || 99)
-    );
+    // Only customers who actually paid the $25 deposit get portal access.
+    // "pending"/"incomplete" (never paid) and "failed" (payment failed) are
+    // internal intent records only — they do NOT count as an accessible order.
+    const NEVER_PAID = ["pending", "incomplete", "failed"];
+    const sorted = (orders || [])
+      .filter((o) => !NEVER_PAID.includes(o.status))
+      .sort((a, b) => (priority[a.status] || 99) - (priority[b.status] || 99));
 
     const order = sorted[0] || null;
 
