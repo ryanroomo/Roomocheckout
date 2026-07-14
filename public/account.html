@@ -543,8 +543,8 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
         <div class="card-row"><span class="card-row-label">Color</span><span class="card-row-value" id="checkoutColor">Hudson Haze</span></div>
         <div class="card-row"><span class="card-row-label">Term</span><span class="card-row-value" id="checkoutTerm">6 months</span></div>
         <div class="card-row" style="border-top:1px solid var(--border-light);padding-top:var(--space-sm);margin-top:var(--space-sm)"><span class="card-row-label" style="font-weight:600;color:var(--text-primary)">Monthly</span><span class="card-row-value" style="font-family:var(--font-heading);font-weight:700;font-size:17px" id="checkoutMonthly">$349 / month</span></div>
-        <div class="card-row"><span class="card-row-label">Refundable deposit</span><span class="card-row-value" id="checkoutDeposit">$349</span></div>
-        <p style="font-size:11px;color:var(--text-muted);line-height:1.35;margin-top:var(--space-sm)">Deposit equals one monthly payment and is fully refundable until your delivery is scheduled.</p>
+        <div class="card-row"><span class="card-row-label">Refundable deposit</span><span class="card-row-value" id="checkoutDeposit">$25</span></div>
+        <p style="font-size:11px;color:var(--text-muted);line-height:1.35;margin-top:var(--space-sm)">$25 refundable deposit, applied to your first month. Fully refundable until your delivery is scheduled.</p>
       </div>
       <div style="font-family:var(--font-heading);font-weight:700;font-size:14px;color:var(--text-primary);margin-bottom:var(--space-md)">Payment Method</div>
       <div class="pay-field">
@@ -1610,7 +1610,7 @@ function getConfigLabel() {
 function getDraftOverviewHtml() {
   const m = computeMonthly(demoPlan.setId, demoPlan.months, demoPlan.omit);
   const rowStyle = 'line-height:1.7';
-  return '<div class="cards-grid"><div class="card card-plan-h card-full animate-in">' + draftPlanImageBlock() + '<div class="plan-content"><div class="card-header"><span class="card-title">Draft Plan</span><span class="card-badge badge-error">Action Needed</span></div><div class="card-row" style="' + rowStyle + '"><span class="card-row-label">Set</span><span class="card-row-value" id="draftSetVal">' + setLabel(demoPlan.setId) + '</span></div><div class="card-row" style="' + rowStyle + '"><span class="card-row-label">Color</span><span class="card-row-value" id="draftColorVal">' + colorDisplayName(demoPlan.colorSlug) + '</span></div><div class="card-row" style="' + rowStyle + '"><span class="card-row-label">Configuration</span><span class="card-row-value" id="draftConfigVal">' + getConfigLabel() + '</span></div><div class="card-row" style="' + rowStyle + '"><span class="card-row-label">Term</span><span class="card-row-value" id="draftTerm">' + demoPlan.months + ' months</span></div><div class="card-row" style="' + rowStyle + '"><span class="card-row-label">Monthly</span><span class="card-row-value" id="draftMonthly">$' + m + '</span></div><div class="card-row" style="' + rowStyle + '"><span class="card-row-label">Refundable deposit</span><span class="card-row-value" id="draftDeposit">$' + m + '</span></div><p style="font-size:11px;color:var(--text-muted);line-height:1.6;margin:var(--space-sm) 0 var(--space-md)">Due at checkout. Deposit equals one monthly payment (product-config).</p><div class="card-actions"><a class="btn btn-primary" href="#" onclick="openCheckoutModal();return false;">Complete Checkout</a><a class="btn btn-ghost" href="#" onclick="openEditTermModal();return false;">Edit</a></div><div style="margin-top:8px;text-align:right"><a href="#" onclick="openCancelModal();return false;" style="font-size:12px;color:var(--text-muted);text-decoration:underline">Cancel order</a></div></div></div></div>';
+  return '<div class="cards-grid"><div class="card card-plan-h card-full animate-in">' + draftPlanImageBlock() + '<div class="plan-content"><div class="card-header"><span class="card-title">Draft Plan</span><span class="card-badge badge-error">Action Needed</span></div><div class="card-row" style="' + rowStyle + '"><span class="card-row-label">Set</span><span class="card-row-value" id="draftSetVal">' + setLabel(demoPlan.setId) + '</span></div><div class="card-row" style="' + rowStyle + '"><span class="card-row-label">Color</span><span class="card-row-value" id="draftColorVal">' + colorDisplayName(demoPlan.colorSlug) + '</span></div><div class="card-row" style="' + rowStyle + '"><span class="card-row-label">Configuration</span><span class="card-row-value" id="draftConfigVal">' + getConfigLabel() + '</span></div><div class="card-row" style="' + rowStyle + '"><span class="card-row-label">Term</span><span class="card-row-value" id="draftTerm">' + demoPlan.months + ' months</span></div><div class="card-row" style="' + rowStyle + '"><span class="card-row-label">Monthly</span><span class="card-row-value" id="draftMonthly">$' + m + '</span></div><div class="card-row" style="' + rowStyle + '"><span class="card-row-label">Refundable deposit</span><span class="card-row-value" id="draftDeposit">$25</span></div><p style="font-size:11px;color:var(--text-muted);line-height:1.6;margin:var(--space-sm) 0 var(--space-md)">$25 refundable deposit due at checkout, applied to your first month.</p><div class="card-actions"><a class="btn btn-primary" href="#" onclick="openCheckoutModal();return false;">Complete Checkout</a><a class="btn btn-ghost" href="#" onclick="openEditTermModal();return false;">Edit</a></div><div style="margin-top:8px;text-align:right"><a href="#" onclick="openCancelModal();return false;" style="font-size:12px;color:var(--text-muted);text-decoration:underline">Cancel order</a></div></div></div></div>';
 }
 function redrawDraftOverview() {
   if (currentStatus !== 2 || currentTab !== 'overview') return;
@@ -2095,7 +2095,7 @@ function syncCheckoutSummaryFromDemo() {
   const m = computeMonthly(demoPlan.setId, demoPlan.months, demoPlan.omit);
   document.getElementById('checkoutTerm').textContent = demoPlan.months + ' months';
   document.getElementById('checkoutMonthly').textContent = '$' + m + ' / month';
-  document.getElementById('checkoutDeposit').textContent = '$' + m;
+  document.getElementById('checkoutDeposit').textContent = '$25';
   document.getElementById('checkoutRoomSet').textContent = setLabel(demoPlan.setId);
   document.getElementById('checkoutColor').textContent = colorDisplayName(demoPlan.colorSlug);
 }
@@ -2111,7 +2111,7 @@ function confirmCheckout() {
   const m = computeMonthly(demoPlan.setId, demoPlan.months, demoPlan.omit);
   document.getElementById('checkoutConfirmTerm').textContent = demoPlan.months + ' months';
   document.getElementById('checkoutConfirmMonthly').textContent = '$' + m + ' / month';
-  document.getElementById('checkoutConfirmDeposit').textContent = '$' + m;
+  document.getElementById('checkoutConfirmDeposit').textContent = '$25';
   document.getElementById('checkoutConfirmSet').textContent = setLabel(demoPlan.setId) + ' · ' + colorDisplayName(demoPlan.colorSlug);
   document.getElementById('checkoutStep1').style.display='none';
   document.getElementById('checkoutStep2').style.display='block';
