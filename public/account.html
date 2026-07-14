@@ -1463,7 +1463,12 @@ function loadPortalData(authHeader) {
   fetch(_url, _opts)
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      if (data.error) { console.warn('portal-status:', data.error); return; }
+      // No account, or an account with no order under this email → don't show
+      // the portal; show a "not found" screen instead.
+      if (data.error || !data.order) {
+        showNoOrder((data && data.customer && data.customer.email) || window.__sessionEmail || '');
+        return;
+      }
       _apiData = data;
       BACKEND = mapApiToBackend(data);
       // Update confirmed plan from API data
@@ -1874,8 +1879,9 @@ function renderContent(s, tab) {
           <a class="btn btn-primary" href="#" onclick="acctSetPassword();return false;" style="width:auto">Save password</a>
           <div style="height:22px"></div>
           <div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:8px">Sign-in methods</div>
-          <p style="font-size:12px;color:#816E68;margin:0 0 10px;line-height:1.5">Link your Google account so you can sign in with one click.</p>
-          <a class="btn btn-ghost" href="#" onclick="acctLinkGoogle();return false;" style="width:auto">Link Google account</a>
+          <div id="acctMethods" style="margin-bottom:10px"></div>
+          <p id="acctGoogleNote" style="font-size:12px;color:#816E68;margin:0 0 10px;line-height:1.5">Link your Google account so you can sign in with one click.</p>
+          <a id="acctGoogleBtn" class="btn btn-ghost" href="#" onclick="acctLinkGoogle();return false;" style="width:auto">Link Google account</a>
         </div>
       </div>
       <div class="card card-full animate-in">
@@ -1886,8 +1892,32 @@ function renderContent(s, tab) {
         </div>
       </div>
     </div>`;
+    acctLoadMethods();
   }
   document.getElementById('billingBadge').style.display = (s===6)?'inline':'none';
+}
+// Show which sign-in methods are connected (email / Google), hide Link if linked.
+async function acctLoadMethods() {
+  var sb = window.__sb;
+  var box = document.getElementById('acctMethods');
+  if (!box || !sb) return;
+  try {
+    var res = await sb.auth.getUserIdentities();
+    var ids = (res && res.data && res.data.identities) || [];
+    var email = ids.find(function(i){ return i.provider === 'email'; });
+    var google = ids.find(function(i){ return i.provider === 'google'; });
+    var gEmail = google && google.identity_data ? google.identity_data.email : '';
+    var rows = '';
+    if (email) rows += '<div class="card-row"><span class="card-row-label">Email &amp; password</span><span class="card-row-value">Connected</span></div>';
+    if (google) rows += '<div class="card-row"><span class="card-row-label">Google</span><span class="card-row-value">' + (gEmail || 'Connected') + '</span></div>';
+    box.innerHTML = rows;
+    var btn = document.getElementById('acctGoogleBtn');
+    var note = document.getElementById('acctGoogleNote');
+    if (google) {
+      if (btn) btn.style.display = 'none';
+      if (note) note.textContent = 'Google is connected' + (gEmail ? (' (' + gEmail + ')') : '') + '.';
+    }
+  } catch (e) { /* ignore */ }
 }
 function acctShowMsg(text, ok) {
   var el = document.getElementById('acctMsg');
@@ -1909,16 +1939,45 @@ async function acctSetPassword() {
     else { acctShowMsg('Password saved. You can now log in with email + password.', true); if (el) el.value = ''; }
   } catch (e) { acctShowMsg(e.message || 'Something went wrong.', false); }
 }
-function acctLinkGoogle() {
+async function acctLinkGoogle() {
   var sb = window.__sb;
   if (!sb) { acctShowMsg('You are not signed in.', false); return; }
-  sb.auth.linkIdentity({ provider: 'google', options: { redirectTo: location.origin + location.pathname } });
+  try {
+    var r = await sb.auth.linkIdentity({ provider: 'google', options: { redirectTo: location.origin + location.pathname } });
+    // On success this redirects to Google; if it returns an error, show it.
+    if (r && r.error) acctShowMsg(r.error.message, false);
+  } catch (e) {
+    acctShowMsg(e.message || 'Could not start Google linking.', false);
+  }
 }
 async function acctLogout() {
   var sb = window.__sb;
   try { if (sb) await sb.auth.signOut(); } catch (e) {}
   try { window.__accessToken = null; } catch (e) {}
   location.href = location.origin + location.pathname; // back to login screen
+}
+
+// Signed in, but no order exists under this email → don't show the portal.
+function showNoOrder(email) {
+  document.body.classList.remove('page-loading');
+  if (window.__hideBoot) window.__hideBoot();
+  var cover = document.getElementById('noOrderCover');
+  if (!cover) {
+    cover = document.createElement('div');
+    cover.id = 'noOrderCover';
+    cover.style.cssText = "position:fixed;inset:0;z-index:150000;background:#F9F5F1;display:flex;align-items:center;justify-content:center;padding:24px;font-family:'Manrope','League Spartan',sans-serif;text-align:center;";
+    document.body.appendChild(cover);
+  }
+  cover.innerHTML = '<div style="max-width:420px">'
+    + '<div style="font-family:\'MuseoModerno\',cursive;font-size:26px;color:#49372A;margin-bottom:18px">ROOMO</div>'
+    + '<div style="font-size:18px;font-weight:700;color:#49372A;margin-bottom:8px">No order found</div>'
+    + '<p style="font-size:14px;color:#8B7355;line-height:1.6;margin:0 0 20px">We couldn\'t find an order under '
+    + (email ? '<b>' + email + '</b>' : 'this account')
+    + '.<br>If you ordered with a different email, log out and sign in with that one.</p>'
+    + '<a href="https://www.roomonyc.com/living-detail-page" style="display:inline-block;background:#49372A;color:#F9F5F1;text-decoration:none;padding:12px 24px;border-radius:999px;font-size:14px;font-weight:700;margin-bottom:12px">Browse sets</a><br>'
+    + '<button onclick="acctLogout()" style="background:none;border:none;color:#8B7355;font-family:inherit;font-size:13px;text-decoration:underline;cursor:pointer;padding:6px">Log out</button>'
+    + '</div>';
+  cover.style.display = 'flex';
 }
 function openReschedule() {
   // Set calendar to delivery date month, or next month from today
@@ -3245,6 +3304,7 @@ switchStatus(_initStatus);
         authHeader = 'Bearer ' + s.data.session.access_token;
         window.__accessToken = s.data.session.access_token;
         orderEmail = orderEmail || s.data.session.user.email;
+        window.__sessionEmail = s.data.session.user.email;
       }
     } catch(e){}
 
@@ -3264,6 +3324,7 @@ switchStatus(_initStatus);
       if (event === 'SIGNED_IN' && session) {
         window.__accessToken = session.access_token;
         orderEmail = orderEmail || session.user.email;
+        window.__sessionEmail = session.user.email;
         window.__hideLogin();
         loadPortalData('Bearer ' + session.access_token);
       }
