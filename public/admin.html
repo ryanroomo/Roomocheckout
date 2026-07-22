@@ -990,6 +990,20 @@ tbody tr:last-child td {
           </div>
         </div>
       </div>
+
+      <div class="section-card">
+        <h3 style="margin:0 0 4px">Agent referral codes</h3>
+        <p style="color:var(--text-secondary);font-size:13px;margin:0 0 14px">Create a code for an agent (10% off the first 3 months, any lease). Leave the code blank to auto-generate the next BKNY0x.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+          <input id="acAgent" class="search-input" type="text" placeholder="Agent name (e.g. Diana)" style="flex:1;min-width:180px">
+          <input id="acCode" class="search-input" type="text" placeholder="Code (optional — blank = auto)" style="flex:1;min-width:180px;text-transform:uppercase">
+          <button id="acGen" class="btn-primary" style="padding:9px 20px;border-radius:8px;border:none;background:var(--text);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Create code</button>
+        </div>
+        <div id="acErr" style="display:none;font-size:13px;color:var(--red);background:var(--red-bg);border-radius:8px;padding:8px 12px;margin-bottom:10px"></div>
+        <div id="acOk" style="display:none;font-size:14px;color:#4A7C59;background:var(--green-bg);border-radius:8px;padding:10px 12px;margin-bottom:10px"></div>
+        <div style="font-size:12px;color:var(--text-secondary);margin:6px 0 6px">Existing agent codes</div>
+        <div id="acList" style="font-size:13px;color:var(--text)"></div>
+      </div>
     </div>
 
   </div>
@@ -1213,6 +1227,7 @@ tabs.forEach(tab => {
 
     if (tab.dataset.tab === 'orders' && !ordersLoaded) loadOrders();
     if (tab.dataset.tab === 'calendar' && !calendarLoaded) loadCalendar();
+    if (tab.dataset.tab === 'tools' && typeof acLoadList === 'function') acLoadList();
   });
 });
 
@@ -2038,6 +2053,49 @@ document.getElementById('plGen').addEventListener('click', async function(){
     document.getElementById('plResult').style.display='block';
   } catch(err){ var e2=document.getElementById('plErr'); e2.textContent=err.message; e2.style.display='block'; }
   this.textContent='Generate'; this.disabled=false;
+});
+
+// ─── Agent referral codes ───
+async function acLoadList() {
+  var box = document.getElementById('acList');
+  if (!box) return;
+  try {
+    var r = await fetch('/api/admin/agent-codes', { headers: { 'Authorization': 'Bearer ' + getPassword() } });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Failed');
+    var codes = d.codes || [];
+    if (!codes.length) { box.innerHTML = '<span style="color:var(--text-secondary)">None yet.</span>'; return; }
+    box.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;color:var(--text-secondary)"><th style="padding:4px 8px 4px 0">Code</th><th style="padding:4px 8px">Agent</th><th style="padding:4px 8px">Uses</th></tr></thead><tbody>'
+      + codes.map(function(c){
+          var agent = (c.partner || '').replace(/^agent_/, '');
+          return '<tr><td style="padding:4px 8px 4px 0;font-family:monospace;font-weight:700">' + c.code + '</td><td style="padding:4px 8px">' + agent + '</td><td style="padding:4px 8px">' + (c.current_uses || 0) + '</td></tr>';
+        }).join('')
+      + '</tbody></table>';
+  } catch (e) { box.innerHTML = '<span style="color:var(--red)">Could not load codes.</span>'; }
+}
+document.getElementById('acGen').addEventListener('click', async function(){
+  var agent = document.getElementById('acAgent').value.trim();
+  var code = document.getElementById('acCode').value.trim();
+  document.getElementById('acErr').style.display = 'none';
+  document.getElementById('acOk').style.display = 'none';
+  if (!agent) { var e = document.getElementById('acErr'); e.textContent = 'Enter an agent name.'; e.style.display = 'block'; return; }
+  this.textContent = '...'; this.disabled = true;
+  try {
+    var r = await fetch('/api/admin/agent-codes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getPassword() },
+      body: JSON.stringify({ agent: agent, code: code || undefined })
+    });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Failed');
+    var ok = document.getElementById('acOk');
+    ok.innerHTML = 'Created <b style="font-family:monospace">' + d.code + '</b> for <b>' + agent + '</b> — 10% off first 3 months.';
+    ok.style.display = 'block';
+    document.getElementById('acAgent').value = '';
+    document.getElementById('acCode').value = '';
+    acLoadList();
+  } catch (err) { var e2 = document.getElementById('acErr'); e2.textContent = err.message; e2.style.display = 'block'; }
+  this.textContent = 'Create code'; this.disabled = false;
 });
 
 // ─── Init ───
