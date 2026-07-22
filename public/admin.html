@@ -933,7 +933,7 @@ tbody tr:last-child td {
 
     <!-- Tools -->
     <div class="tab-panel" id="panel-tools">
-      <div class="section-card" style="margin-bottom:16px">
+      <div class="section-card" style="margin-bottom:16px;padding:24px 28px">
         <h3 style="margin:0 0 4px">Portal preview (fake data)</h3>
         <p style="color:var(--text-secondary);font-size:13px;margin:0 0 14px">Preview any status + configuration exactly as a customer would see it. No login, no real data.</p>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px">
@@ -971,7 +971,7 @@ tbody tr:last-child td {
         </div>
       </div>
 
-      <div class="section-card">
+      <div class="section-card" style="margin-bottom:16px;padding:24px 28px">
         <h3 style="margin:0 0 4px">Customer portal links</h3>
         <p style="color:var(--text-secondary);font-size:13px;margin:0 0 14px">Generate a real signed link for any customer email — to test the login/onboarding flow, or to view their live portal read-only.</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
@@ -991,7 +991,7 @@ tbody tr:last-child td {
         </div>
       </div>
 
-      <div class="section-card">
+      <div class="section-card" style="padding:24px 28px">
         <h3 style="margin:0 0 4px">Agent referral codes</h3>
         <p style="color:var(--text-secondary);font-size:13px;margin:0 0 14px">Create a code for an agent (10% off the first 3 months, any lease). Leave the code blank to auto-generate the next BKNY0x.</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
@@ -2065,10 +2065,10 @@ async function acLoadList() {
     if (!r.ok) throw new Error(d.error || 'Failed');
     var codes = d.codes || [];
     if (!codes.length) { box.innerHTML = '<span style="color:var(--text-secondary)">None yet.</span>'; return; }
-    box.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;color:var(--text-secondary)"><th style="padding:4px 8px 4px 0">Code</th><th style="padding:4px 8px">Agent</th><th style="padding:4px 8px">Uses</th></tr></thead><tbody>'
+    box.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;color:var(--text-secondary);font-size:11px;letter-spacing:.04em;text-transform:uppercase"><th style="padding:6px 8px 8px 0;border-bottom:1px solid var(--border)">Code</th><th style="padding:6px 8px 8px;border-bottom:1px solid var(--border)">Agent</th><th style="padding:6px 8px 8px;border-bottom:1px solid var(--border)">Uses</th></tr></thead><tbody>'
       + codes.map(function(c){
           var agent = (c.partner || '').replace(/^agent_/, '');
-          return '<tr><td style="padding:4px 8px 4px 0;font-family:monospace;font-weight:700">' + c.code + '</td><td style="padding:4px 8px">' + agent + '</td><td style="padding:4px 8px">' + (c.current_uses || 0) + '</td></tr>';
+          return '<tr><td style="padding:9px 8px 9px 0;font-family:monospace;font-weight:700;border-bottom:1px solid var(--border)">' + c.code + '</td><td style="padding:9px 8px;border-bottom:1px solid var(--border)">' + agent + '</td><td style="padding:9px 8px;border-bottom:1px solid var(--border)">' + (c.current_uses || 0) + '</td></tr>';
         }).join('')
       + '</tbody></table>';
   } catch (e) { box.innerHTML = '<span style="color:var(--red)">Could not load codes.</span>'; }
