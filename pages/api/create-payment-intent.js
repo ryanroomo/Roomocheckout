@@ -69,13 +69,30 @@ export default async function handler(req, res) {
       mode: i.mode || (Number(i.months) > 0 ? "rent" : "buy-new"),
     }));
 
+    // ── Auto 3-set bundle discount ───────────────────────────
+    // If the cart contains all three sets (living + dining + bedding), in ANY
+    // combination of rent/buy, every item gets 5% off. This is a permanent
+    // price cut — it applies every month for the whole term — so we bake it
+    // straight into the stored amounts. That way it flows through the first
+    // month, the security deposit, the monthly subscription and the buyout
+    // automatically. It STACKS with coupon codes, which are computed below
+    // against these already-reduced amounts (i.e. discounts compound).
+    const BUNDLE_SETS = ["living", "dining", "bedding"];
+    const setTypesInCart = new Set(normalized.map((i) => i.set));
+    const isBundle = BUNDLE_SETS.every((s) => setTypesInCart.has(s));
+    const bundlePct = isBundle ? 5 : 0;
+
+    // Effective per-item price in cents, after the bundle discount.
+    const itemCents = (i) =>
+      Math.round((Number(i.price) || 0) * 100 * (1 - bundlePct / 100));
+
     // Compute future-billing amounts so stage 2 can read them straight from the DB.
     const rentalMonthlyCents = normalized
       .filter((i) => i.mode === "rent")
-      .reduce((sum, i) => sum + Math.round(Number(i.price) || 0) * 100, 0);
+      .reduce((sum, i) => sum + itemCents(i), 0);
     const buyTotalCents = normalized
       .filter((i) => i.mode === "buy-new")
-      .reduce((sum, i) => sum + Math.round(Number(i.price) || 0) * 100, 0);
+      .reduce((sum, i) => sum + itemCents(i), 0);
 
     // Longest rental term in the cart — drives the conditional building-lease promo.
     const leaseMonths = normalized
@@ -184,6 +201,7 @@ export default async function handler(req, res) {
         itemCount: String(items.length),
         couponCode: validatedCoupon ? validatedCoupon.code : "",
         discountCents: String(discountCents),
+        bundleDiscountPct: String(bundlePct),
       },
       receipt_email: email,
       description: `Roomo $25 deposit – ${items.length} set(s)`,
@@ -237,7 +255,7 @@ export default async function handler(req, res) {
         mode: i.mode,
         palette: i.palette || null,
         months: Number(i.months) || 0,
-        price_cents: Math.round(Number(i.price) || 0) * 100,
+        price_cents: itemCents(i),
         excluded: Array.isArray(i.excluded) ? i.excluded : [],
       }));
       const { error: itemsErr } = await supabase.from("order_items").insert(rows);

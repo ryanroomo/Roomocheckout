@@ -437,6 +437,16 @@ function StepCart({
     const buyItems = cart.filter((i) => i.mode === "buy-new")
     const totalMonthly = rentItems.reduce((sum, i) => sum + i.price, 0)
     const totalBuy = buyItems.reduce((sum, i) => sum + i.price, 0)
+    // Auto 3-set bundle: all three sets in the cart (any rent/buy mix) → 5% off
+    // everything, every month. Display only — the server recomputes the real
+    // amounts in create-payment-intent.js, so the customer is charged the
+    // reduced price regardless. Stacks with coupon codes.
+    const bundlePct = ["living", "dining", "bedding"].every((s) =>
+        cart.some((i) => i.set === s)
+    )
+        ? 5
+        : 0
+    const bundledMonthly = Math.round(totalMonthly * (1 - bundlePct / 100))
     const [couponInput, setCouponInput] = useState(couponState.code || "")
 
     const handleApplyCoupon = async () => {
@@ -449,7 +459,7 @@ function StepCart({
             const res = await fetch(`${base}/api/validate-coupon`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ code: trimmed, cartTotal: totalMonthly, months: maxMonths }),
+                body: JSON.stringify({ code: trimmed, cartTotal: bundledMonthly, months: maxMonths }),
             })
             const data = await res.json()
             if (data.valid) {
@@ -652,6 +662,17 @@ function StepCart({
             </div>
 
             {/* Discount line (only when coupon is valid and there are rent items) */}
+            {bundlePct > 0 && totalMonthly > 0 && (
+                <div style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    fontFamily: font, fontSize: 12, color: C.green, fontWeight: 600,
+                    marginBottom: 8, padding: "0 4px",
+                }}>
+                    <span>3-set bundle (5% off)</span>
+                    <span>-${totalMonthly - bundledMonthly}/mo</span>
+                </div>
+            )}
+
             {couponState.status === "valid" && couponState.discountAmount > 0 && totalMonthly > 0 && (
                 <div style={{
                     display: "flex", justifyContent: "space-between", alignItems: "center",
