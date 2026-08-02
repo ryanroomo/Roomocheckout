@@ -152,10 +152,26 @@ export default async function handler(req, res) {
           recurring: { interval: "month" },
         });
 
-        // Start billing in 30 days (first month already covered)
-        const trialEnd = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
-        // Auto-cancel after remaining months
-        const cancelAt = Math.floor(Date.now() / 1000) + maxMonths * 30 * 24 * 60 * 60;
+        // Bill on CALENDAR months anchored to the delivery date. Month 1 is the
+        // delivery month (already covered by this capture), so the first
+        // subscription charge is delivery + 1 month, then monthly on the same
+        // day-of-month, and billing stops at delivery + maxMonths months. This
+        // replaces the old "30-day multiple" math, which drifted the lease end
+        // a few days early (e.g. a 9-month lease ended on day 270 ≈ 8.9 months).
+        const nowTs = Math.floor(Date.now() / 1000);
+        const deliveryPlusMonths = (n) => {
+          if (order.delivery_date) {
+            const d = new Date(order.delivery_date + "T12:00:00Z");
+            d.setUTCMonth(d.getUTCMonth() + n);
+            return Math.floor(d.getTime() / 1000);
+          }
+          return nowTs + n * 30 * 24 * 60 * 60; // fallback if no delivery date on file
+        };
+        // First subscription charge = start of month 2 (Stripe needs it future-dated).
+        let trialEnd = deliveryPlusMonths(1);
+        if (trialEnd <= nowTs) trialEnd = nowTs + 60;
+        // Billing stops after month maxMonths.
+        const cancelAt = deliveryPlusMonths(maxMonths);
 
         const subscription = await stripe.subscriptions.create({
           customer: order.customers.stripe_customer_id,
@@ -180,11 +196,11 @@ export default async function handler(req, res) {
 
         subscriptionId = subscription.id;
 
-        // Free month(s) at the END of the lease: extend the lease-end target
-        // (extra possession) WITHOUT extending billing. cancel_at above already
-        // stops the subscription, so no 13th month is ever charged.
+        // Free month(s) at the END of the lease: extra possession WITHOUT extra
+        // billing (cancel_at above already stops charges). Lease-end target is
+        // delivery + (maxMonths + bonus) calendar months.
         const bonusMonths = order.bonus_free_months || 0;
-        const endTs = cancelAt + bonusMonths * 30 * 24 * 60 * 60;
+        const endTs = deliveryPlusMonths(maxMonths + bonusMonths);
         subscriptionEndsAt = new Date(endTs * 1000).toISOString();
       }
     }
