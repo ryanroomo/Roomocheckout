@@ -1219,6 +1219,22 @@ function planImageForStatus(s) {
   if (o.noMattress) return 'images/' + sid + '-' + col + '-no-mattress.png';
   return 'images/' + sid + '-' + col + '-full.png';
 }
+// Image filename for one specific item (used by the multi-set plan list).
+function itemImageSrc(sid, col, o){
+  o = o || {};
+  if (sid === 'living'){
+    if (o.noLamp && o.noPlant) return 'images/'+sid+'-'+col+'-no-lamp-no-plant.png';
+    if (o.noLamp) return 'images/'+sid+'-'+col+'-no-lamp.png';
+    if (o.noPlant) return 'images/'+sid+'-'+col+'-no-plant.png';
+    return 'images/'+sid+'-'+col+'-full.png';
+  }
+  if (sid === 'dining'){
+    if (o.noPlant) return 'images/'+sid+'-'+col+'-no-plant.png';
+    return 'images/'+sid+'-'+col+'-full.png';
+  }
+  if (o.noMattress) return 'images/'+sid+'-'+col+'-no-mattress.png';
+  return 'images/'+sid+'-'+col+'-full.png';
+}
 function planImageBlock(s) {
   const src = planImageForStatus(s);
   const _p = getPlanForStatus ? getPlanForStatus(s) : CONFIRMED_PLAN;
@@ -1406,6 +1422,21 @@ function mapApiToBackend(api) {
   // Address from API (separate fields)
   var ord = api.order || {};
 
+  // All rental items → one plan row each (so multi-set orders list every set).
+  var planItems = (api.items || [])
+    .filter(function(it){ return it.mode !== 'buy-new'; })
+    .map(function(it){
+      var exLower2 = (it.excluded || []).map(function(x){ return String(x).toLowerCase(); });
+      var hx2 = function(kw){ return exLower2.some(function(x){ return x.indexOf(kw) >= 0; }); };
+      return {
+        setId: it.setType || 'living',
+        colorSlug: normalizeColorSlug(it.palette || 'hudson-haze'),
+        months: it.months || 12,
+        omit: { noLamp: hx2('lamp'), noPlant: hx2('plant'), noMattress: hx2('mattress') },
+        monthly: (it.pricePerMonth != null && it.pricePerMonth > 0) ? it.pricePerMonth : 0
+      };
+    });
+
   return {
     _apiStep: api.step,
     _apiBuyout: api.buyout || null,
@@ -1415,6 +1446,7 @@ function mapApiToBackend(api) {
       paymentMethod: { brand: 'Visa', last4: '····' }  // card info not in API; will be set when user updates
     },
     plan: { setId: setId, colorSlug: colorSlug, months: months, omit: omit, monthly: lockedMonthly },
+    planItems: planItems,
     lease: {
       startDateFull: _fmtDate(startDate, 'full'),
       startDateShort: _fmtDate(startDate, 'short'),
@@ -1691,7 +1723,12 @@ function planDetailCard(s, bc, bt) {
   const opts = s>=5&&s<=7
     ? `<a class="btn btn-secondary" href="#" onclick="openRenewModal();return false;">Extend Rental Term</a><a class="btn btn-secondary" href="#" onclick="openBuyoutFlow();return false;">Buy Out</a><a class="btn btn-ghost" href="#" onclick="openReturnSchedule();return false;">Schedule Return</a>`
     : `<a class="btn btn-ghost" href="https://www.roomonyc.com/support" target="_blank">Contact Support</a>`;
-  return `<div class="card card-plan-h card-full animate-in" style="min-height:320px">
+  const _endShort = window._extendedTerm ? window._extendedTerm.endDate : BACKEND.lease.endDateShort;
+  const _items = (BACKEND.planItems && BACKEND.planItems.length) ? BACKEND.planItems : [_plan];
+
+  // ── Single set: original hero-image layout ──
+  if (_items.length === 1) {
+    return `<div class="card card-plan-h card-full animate-in" style="min-height:320px">
     ${planImageBlock(s)}
     <div class="plan-content">
       <div class="card-header"><span class="card-title">Plan Details</span><span class="card-badge ${bc}">${bt}</span></div>
@@ -1706,7 +1743,7 @@ function planDetailCard(s, bc, bt) {
         </div>
         <div style="padding:var(--space-sm);border-right:1px solid var(--border-light)">
           <div style="font-size:11px;font-weight:500;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Est. End</div>
-          <div style="font-family:var(--font-heading);font-weight:700;font-size:15px;color:var(--text-primary)">${window._extendedTerm ? window._extendedTerm.endDate : BACKEND.lease.endDateShort}</div>
+          <div style="font-family:var(--font-heading);font-weight:700;font-size:15px;color:var(--text-primary)">${_endShort}</div>
         </div>
         <div style="padding:var(--space-sm)">
           <div style="font-size:11px;font-weight:500;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Monthly</div>
@@ -1719,6 +1756,50 @@ function planDetailCard(s, bc, bt) {
       </div>
       <div class="card-actions">${opts}</div>
     </div>
+  </div>`;
+  }
+
+  // ── Multiple sets: list every set with its own image, config and price ──
+  const _total = window._extendedTerm
+    ? window._extendedTerm.monthly
+    : _items.reduce(function(sum,p){ return sum + (planMonthly(p)||0); }, 0);
+  const _rows = _items.map(function(p, i){
+    return `<div style="display:flex;gap:12px;align-items:flex-start;padding:14px 0;${i>0?'border-top:1px solid var(--border-light)':''}">
+      <div style="width:60px;height:60px;border-radius:10px;overflow:hidden;flex-shrink:0;background:var(--bg-primary)">
+        <img src="${imgSrc(itemImageSrc(p.setId,p.colorSlug,p.omit))}" alt="${setLabel(p.setId)} Set" style="width:100%;height:100%;object-fit:contain;display:block"/>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline">
+          <div style="font-family:var(--font-heading);font-weight:700;font-size:16px;color:var(--text-primary)">${setLabel(p.setId)} Set</div>
+          <div style="font-family:var(--font-heading);font-weight:700;font-size:15px;color:var(--text-primary);white-space:nowrap">$${planMonthly(p)}<span style="font-size:12px;color:var(--text-muted);font-weight:400">/mo</span></div>
+        </div>
+        <div style="font-size:12px;color:var(--text-secondary);margin:2px 0 4px">${colorDisplayName(p.colorSlug)} · ${p.months}-month rental</div>
+        <div style="font-size:12px;color:var(--text-muted);line-height:1.5">${getIncludedItemsList(p)}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `<div class="card card-full animate-in">
+    <div class="card-header"><span class="card-title">Plan Details</span><span class="card-badge ${bc}">${bt}</span></div>
+    <div>${_rows}</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid var(--border-light);border-bottom:1px solid var(--border-light);margin:var(--space-sm) 0 var(--space-md)">
+      <div style="padding:var(--space-sm) var(--space-sm) var(--space-sm) 0;border-right:1px solid var(--border-light)">
+        <div style="font-size:11px;font-weight:500;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Start</div>
+        <div style="font-family:var(--font-heading);font-weight:700;font-size:15px;color:var(--text-primary)">${BACKEND.lease.startDateFull}</div>
+      </div>
+      <div style="padding:var(--space-sm);border-right:1px solid var(--border-light)">
+        <div style="font-size:11px;font-weight:500;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Est. End</div>
+        <div style="font-family:var(--font-heading);font-weight:700;font-size:15px;color:var(--text-primary)">${_endShort}</div>
+      </div>
+      <div style="padding:var(--space-sm)">
+        <div style="font-size:11px;font-weight:500;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Total /mo</div>
+        <div style="font-family:var(--font-heading);font-weight:700;font-size:15px;color:var(--text-primary)">$${_total}</div>
+      </div>
+    </div>
+    <div style="margin-bottom:var(--space-md)">
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.6">Every set includes delivery, assembly, furniture care support, and end-of-term pickup.</div>
+    </div>
+    <div class="card-actions">${opts}</div>
   </div>`;
 }
 function _addr() { return window._address || BACKEND.address; }
