@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import { supabase } from "../../lib/supabase";
+import { signPortalToken } from "../../lib/authToken";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2024-06-20",
@@ -259,10 +260,31 @@ export default async function handler(req, res) {
       if (itemsErr) throw new Error(`order_items insert: ${itemsErr.message}`);
     }
 
+    // Signed portal link (same one the confirmation email sends) so the
+    // success screen can offer a "View / manage your order" button that works.
+    let portalLink = null;
+    try {
+      const t = signPortalToken(email);
+      portalLink = `https://checkout.roomonyc.com/account.html?token=${encodeURIComponent(t)}`;
+    } catch {
+      /* non-fatal: success screen just omits the button */
+    }
+
     res.status(200).json({
       clientSecret: paymentIntent.client_secret,
       amount: depositCents,
       orderId: order.id,
+      portalLink,
+      summary: {
+        deliveryDate: deliveryDate || null,
+        deliverySlot: deliverySlot || null,
+        items: normalized.map((i) => ({
+          setType: i.set,
+          mode: i.mode,
+          months: Number(i.months) || 0,
+          priceCents: itemCents(i),
+        })),
+      },
     });
   } catch (err) {
     console.error("create-payment-intent error:", err);

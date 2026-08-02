@@ -1985,7 +1985,7 @@ async function acctSetPassword() {
   var pass = el ? el.value : '';
   if (!pass || pass.length < 8) { acctShowMsg('Password must be at least 8 characters.', false); return; }
   try {
-    var r = await sb.auth.updateUser({ password: pass });
+    var r = await sb.auth.updateUser({ password: pass, data: { has_password: true } });
     if (r.error) acctShowMsg(r.error.message, false);
     else { acctShowMsg('Password saved. You can now log in with email + password.', true); if (el) el.value = ''; }
   } catch (e) { acctShowMsg(e.message || 'Something went wrong.', false); }
@@ -3354,6 +3354,7 @@ switchStatus(_initStatus);
 
     // 2) Resolve any active session
     var authHeader = null;
+    var hasPassword = false;
     try {
       var s = await sb.auth.getSession();
       if (s.data && s.data.session) {
@@ -3361,13 +3362,16 @@ switchStatus(_initStatus);
         window.__accessToken = s.data.session.access_token;
         orderEmail = orderEmail || s.data.session.user.email;
         window.__sessionEmail = s.data.session.user.email;
+        hasPassword = !!((s.data.session.user.user_metadata || {}).has_password);
       }
     } catch(e){}
 
     // 3) Route
     if (authHeader) {
       loadPortalData(authHeader);
-      if (onboardEmail) window.__showOnboard(onboardEmail);
+      // Only first-timers (no password set yet) see the "set a password"
+      // onboarding. Returning users who already have one go straight to portal.
+      if (onboardEmail && !hasPassword) window.__showOnboard(onboardEmail);
     } else if (token) {
       loadPortalData(null); // legacy token, couldn't mint a session
     } else {
@@ -3397,6 +3401,9 @@ switchStatus(_initStatus);
       var r = await sb.auth.signInWithPassword({ email: email, password: pass });
       this.textContent='Log in'; this.disabled=false;
       if (r.error) { err('loginErr', r.error.message); }
+      // Backfill the flag for accounts created before we tracked it, so the
+      // "set a password" prompt never shows again for a password user.
+      else { try { await sb.auth.updateUser({ data: { has_password: true } }); } catch(e){} }
       // success handled by onAuthStateChange
     });
     $('loginGoogle').addEventListener('click', function(){
@@ -3416,7 +3423,7 @@ switchStatus(_initStatus);
       var pass = $('obPass').value;
       if (!pass || pass.length < 8) { err('obErr','Password must be at least 8 characters.'); return; }
       this.textContent='Saving...'; this.disabled=true;
-      var r = await sb.auth.updateUser({ password: pass });
+      var r = await sb.auth.updateUser({ password: pass, data: { has_password: true } });
       this.textContent='Set password'; this.disabled=false;
       if (r.error) { err('obErr', r.error.message); }
       else { ok('obOk','Password set! You can now log in with email + password.'); setTimeout(function(){ hide('authOnboard'); }, 1400); }
