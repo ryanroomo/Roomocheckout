@@ -1638,6 +1638,7 @@ function mapApiToBackend(api) {
     },
     billing: {
       monthlyAmount: api.order ? api.order.monthlyRent : 0,
+      nextChargeAmount: (api.order && api.order.nextCharge != null) ? api.order.nextCharge : (api.order ? api.order.monthlyRent : 0),
       nextDueDateFull: nextDueDate,
       nextDueMonthLabel: nextDueMonthLabel,
       nextNextDueDateFull: nextNextDue,
@@ -2122,7 +2123,7 @@ function paymentCard(f, full=false) {
   const _failAmt = '$' + BACKEND.billing.failedPaymentAmount.toFixed(2);
   const _pmInfo = _pm();
   if(f) return `<div class="${cls}"><div class="card-header"><span class="card-title">Payment Issue</span><span style="width:22px;height:22px;border-radius:50%;background:rgba(180,60,40,0.12);color:#a03020;font-size:13px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">!</span></div><div class="card-body">We could not process your payment of ${_failAmt} on ${BACKEND.billing.failedPaymentDate}.</div><div class="card-row"><span class="card-row-label">Payment Method</span><span class="card-row-value">${_pmInfo.brand} ending in ${_pmInfo.last4}</span></div><div class="card-actions"><a class="btn btn-warn" href="#" onclick="openPaymentModal();return false;">Update Payment Method</a><a class="btn btn-ghost" href="#" onclick="openTryAgainModal();return false;">Try Again</a></div></div>`;
-  const _monthlyAmt = '$' + BACKEND.billing.monthlyAmount.toFixed(2);
+  const _monthlyAmt = '$' + (BACKEND.billing.nextChargeAmount != null ? BACKEND.billing.nextChargeAmount : BACKEND.billing.monthlyAmount).toFixed(2);
   const _pm2 = _pm();
   return `<div class="${cls}"><div class="card-header"><span class="card-title">Payment</span></div><div style="display:flex;align-items:flex-end;justify-content:space-between;padding:var(--space-md) 0 var(--space-sm);border-bottom:1px solid var(--border-light);margin-bottom:var(--space-md)"><div><div style="font-size:11px;font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Amount Due</div><div style="font-family:var(--font-body);font-weight:700;font-size:32px;color:var(--text-primary);line-height:1;letter-spacing:-1px">${_monthlyAmt}</div></div><div style="text-align:right;padding-bottom:4px"><div style="font-size:11px;font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Due Date</div><div style="font-family:var(--font-body);font-weight:700;font-size:20px;color:var(--text-primary);line-height:1">${BACKEND.billing.nextDueDateFull}</div></div></div><div class="card-row"><span class="card-row-label">Method</span><span class="card-row-value">${_pm2.brand} ending in ${_pm2.last4}</span></div><div class="card-actions"><a class="btn btn-primary" href="#" onclick="openMakePaymentModal();return false;">Make Payment</a><a class="btn btn-ghost" href="#" onclick="openPaymentModal();return false;">Update Payment Method</a></div></div>`;
 }

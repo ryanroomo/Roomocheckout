@@ -305,6 +305,33 @@ export default async function handler(req, res) {
       };
     }
 
+    // Next monthly charge — reflects the intro % discount on the first N rental
+    // months. Month 1 was paid at capture; each succeeded `subscription`
+    // payment is one further month, so the next charge is month (subCount + 2).
+    // Only building-lease intro coupons discount recurring months (they carry
+    // intro_discount_months); plain/first-month coupons fall through to full.
+    if (order && order.status === "active" && order.rental_monthly_cents > 0 && response.order) {
+      const monthlyCents = order.rental_monthly_cents;
+      let nextChargeCents = monthlyCents;
+      const subCount = (order.payments || []).filter(
+        (p) => p.type === "subscription" && p.status === "succeeded"
+      ).length;
+      const nextMonthIndex = subCount + 2;
+      if ((order.discount_cents || 0) > 0 && order.coupon_code) {
+        const { data: coupon } = await supabase
+          .from("coupons")
+          .select("intro_discount_pct, intro_discount_months")
+          .eq("code", order.coupon_code)
+          .maybeSingle();
+        const pct = Number(coupon?.intro_discount_pct) || 0;
+        const introMonths = Number(coupon?.intro_discount_months) || 0;
+        if (pct > 0 && nextMonthIndex <= introMonths) {
+          nextChargeCents = Math.round(monthlyCents * (1 - pct / 100));
+        }
+      }
+      response.order.nextCharge = nextChargeCents / 100;
+    }
+
     res.status(200).json(response);
   } catch (err) {
     console.error("portal-status error:", err);
