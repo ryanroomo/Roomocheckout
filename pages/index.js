@@ -30,8 +30,10 @@ const font =
 
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
+const SET_LABELS = { living: "Living", dining: "Dining", bedding: "Bedroom" };
+
 function formatItemLine(it) {
-  const name = cap(it.setType) + " Set";
+  const name = (SET_LABELS[it.setType] || cap(it.setType)) + " Set";
   const price = "$" + Math.round((it.priceCents || 0) / 100);
   return it.mode === "rent"
     ? `${name} · ${it.months}-mo rental · ${price}/mo`
