@@ -126,8 +126,10 @@ export default async function handler(req, res) {
     }
 
     // ── Send cancellation email to customer ──────────────────
+    // Skip it for "pending"/incomplete intents — those never paid a deposit or
+    // became a real order, so a cancellation email would only confuse them.
     const customer = order.customers;
-    if (customer && customer.email) {
+    if (customer && customer.email && prevStatus !== "pending") {
       try {
         await sendCancellationEmail({
           email: customer.email,

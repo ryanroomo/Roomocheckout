@@ -136,16 +136,9 @@ export default async function handler(req, res) {
         }
       }
 
-      try {
-        await sendCancellationEmail({
-          email: customer.email,
-          name: customer.name,
-          order,
-          refunded: false,
-        });
-      } catch (emailErr) {
-        console.error("Cancellation email failed (non-fatal):", emailErr);
-      }
+      // No cancellation email for an unpaid/incomplete intent — the customer
+      // never paid or received a confirmation, so a cancellation notice would
+      // only confuse them.
 
       return res.status(200).json({
         success: true,
