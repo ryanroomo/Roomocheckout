@@ -1557,12 +1557,12 @@ function mapApiToBackend(api) {
   };
 
   // Dates
-  const startDate = api.order ? api.order.createdAt : null;
+  const startDate = api.order ? (api.order.deliveryDate || api.order.createdAt) : null;
   const endDate = api.order ? api.order.subscriptionEndsAt : null;
   const deliveryDate = api.order ? api.order.deliveryDate : null;
 
   // Next due date = one month after last payment, or one month after start
-  const payments = api.payments || [];
+  const payments = (api.payments || []).filter(function(p){ return p.type !== 'pre_auth'; });
   const successPayments = payments.filter(function(p) { return p.status === 'succeeded'; });
   const totalPaidNum = successPayments.reduce(function(s, p) { return s + p.amount; }, 0);
 
@@ -1575,17 +1575,21 @@ function mapApiToBackend(api) {
     };
   });
 
-  // Next due date estimate (start date + # months paid so far + 1)
-  var nextDueDate = '', nextDueMonthLabel = '', nextNextDue = '';
+  // Next due = delivery-day anchored. Month 1 is covered at delivery (capture);
+  // each succeeded `subscription` payment is one further month. So the next
+  // charge is deliveryDate + (subscription cycles paid + 1) months.
+  var nextDueDate = '', nextDueMonthLabel = '', nextNextDue = '', autopayDayLabel = '';
   if (startDate) {
-    var sd = new Date(startDate);
-    var monthsPaid = successPayments.length;
-    var nd = new Date(sd); nd.setMonth(nd.getMonth() + monthsPaid);
+    var sd = _localDate(startDate);
+    var subCycles = successPayments.filter(function(p){ return p.type === 'subscription'; }).length;
+    var nd = new Date(sd); nd.setMonth(nd.getMonth() + subCycles + 1);
     nextDueDate = _fmtDate(nd.toISOString(), 'full');
     var mNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     nextDueMonthLabel = mNames[nd.getMonth()];
     var nnd = new Date(nd); nnd.setMonth(nnd.getMonth() + 1);
     nextNextDue = _fmtDate(nnd.toISOString(), 'full');
+    var _apDay = sd.getDate(), _apV = _apDay % 100;
+    autopayDayLabel = _apDay + ((_apV>=11&&_apV<=13) ? 'th' : (['th','st','nd','rd'][_apDay%10] || 'th'));
   }
 
   // Failed payment info
@@ -1641,6 +1645,7 @@ function mapApiToBackend(api) {
       failedPaymentDateShort: failedPmt ? _fmtDate(failedPmt.date, 'short') : '',
       failedPaymentAmount: failedPmt ? failedPmt.amount : 0,
       autopayEnabled: true,
+      autopayDayLabel: autopayDayLabel,
       totalPaid: _fmtDollars(totalPaidNum),
       paymentHistory: paymentHistory
     },
@@ -2142,7 +2147,7 @@ function addressCard() { return `<div class="card animate-in"><div class="card-h
 function supportCard() { return `<div class="card animate-in"><div class="card-header"><span class="card-title">Need help?</span></div><div class="card-body">Contact Roomo for delivery changes, billing questions, furniture care, or general support.</div><div class="card-actions"><a class="btn btn-secondary" href="https://www.roomonyc.com/support" target="_blank">Contact Support</a></div></div>`; }
 function autopayCard(on) {
   const _on = (on !== undefined) ? on : BACKEND.billing.autopayEnabled;
-  return `<div class="card animate-in"><div class="card-header"><span class="card-title">Autopay</span></div><div class="toggle-row"><span style="font-size:14px;color:var(--text-secondary)">Autopay is ${_on?'on':'off'}.</span><div class="toggle-track ${_on?'on':''}" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div></div><p style="font-size:13px;color:var(--text-muted);margin-top:4px">${_on?'Your monthly payment will be charged automatically on the 12th.':'Turn on autopay to automatically pay your monthly Roomo balance.'}</p></div>`;
+  return `<div class="card animate-in"><div class="card-header"><span class="card-title">Autopay</span></div><div class="toggle-row"><span style="font-size:14px;color:var(--text-secondary)">Autopay is ${_on?'on':'off'}.</span><div class="toggle-track ${_on?'on':''}" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div></div><p style="font-size:13px;color:var(--text-muted);margin-top:4px">${_on?('Your monthly payment will be charged automatically on the ' + (BACKEND.billing.autopayDayLabel || '1st') + '.'):'Turn on autopay to automatically pay your monthly Roomo balance.'}</p></div>`;
 }
 function endOfTermCard() {
   // Use extended term end date if user has already renewed; otherwise fall back to BACKEND lease end
@@ -2317,10 +2322,10 @@ function _renderContent(s, tab) {
     if(s<=2) area.innerHTML=`<div class="empty-state"><div class="empty-state-title">${s===1?'No billing details yet.':'Billing not completed.'}</div><div class="empty-state-body">${s===1?'Billing details will appear here after you place a Roomo order.':'Complete checkout to confirm your payment method and Roomo plan.'}</div>${s===2?'<a class="btn btn-primary" href="#">Complete Checkout</a>':''}</div>`;
     else {
       const _histRows = BACKEND.billing.paymentHistory.map(r =>
-        `<tr><td>${r.date}</td><td>${r.amount}</td><td><span class="card-badge ${r.status==='paid'?'badge-active':'badge-error'}">${r.status==='paid'?'Paid':'Failed'}</span></td><td><a href="#" style="font-size:12px">${r.status==='paid'?'Receipt':'Retry'}</a></td></tr>`
+        `<tr><td>${r.date}</td><td>${r.amount}</td><td><span class="card-badge ${r.status==='paid'?'badge-active':'badge-error'}">${r.status==='paid'?'Paid':'Failed'}</span></td></tr>`
       ).join('');
-      const _failedRow = s===6 ? `<tr><td>${BACKEND.billing.failedPaymentDateShort || BACKEND.billing.failedPaymentDate}</td><td>$${BACKEND.billing.failedPaymentAmount.toFixed(2)}</td><td><span class="card-badge badge-error">Failed</span></td><td><a href="#" onclick="openTryAgainModal();return false;" style="font-size:12px">Retry</a></td></tr>` : '';
-      area.innerHTML=`<div class="cards-grid">${s===6?paymentCard(true):paymentCard(false)}${(s===3||s===4)?depositHoldCard():''}${autopayCard(BACKEND.billing.autopayEnabled)}<div class="card card-full animate-in"><div class="card-header"><span class="card-title">Recent Payments</span></div><div class="table-wrap"><table class="table-minimal"><thead><tr><th>Date</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>${_failedRow}${_histRows}</tbody></table></div></div></div>`;
+      const _failedRow = s===6 ? `<tr><td>${BACKEND.billing.failedPaymentDateShort || BACKEND.billing.failedPaymentDate}</td><td>$${BACKEND.billing.failedPaymentAmount.toFixed(2)}</td><td><span class="card-badge badge-error">Failed</span></td></tr>` : '';
+      area.innerHTML=`<div class="cards-grid">${s===6?paymentCard(true):paymentCard(false)}${(s===3||s===4)?depositHoldCard():''}${autopayCard(BACKEND.billing.autopayEnabled)}<div class="card card-full animate-in"><div class="card-header"><span class="card-title">Recent Payments</span></div><div class="table-wrap"><table class="table-minimal"><thead><tr><th>Date</th><th>Amount</th><th>Status</th></tr></thead><tbody>${_failedRow}${_histRows}</tbody></table></div></div></div>`;
     }
   } else if(tab==='history') {
     if(s<=2) area.innerHTML=`<div class="empty-state"><div class="empty-state-title">No order history yet.</div><div class="empty-state-body">Your past Roomo rental plans and product orders will appear here after you place an order.</div><a class="btn btn-primary" href="https://www.roomonyc.com/living-detail-page" target="_blank">Browse Roomo Sets</a></div>`;
