@@ -2035,10 +2035,23 @@ function depositHoldCard() {
   const monthly = BACKEND.billing.monthlyAmount || 0;
   const firstMonth = Math.max(monthly - 25, 0);
   const _dd = window._deliveryDate || {};
-  const when = _dd.dateMain ? ' (around ' + _dd.dateMain + ')' : '';
+  // The hold is placed ~48 hours before the delivery day, so show THAT date
+  // (delivery − 2 days), not a vague "around <delivery day>".
+  var _holdDate = '';
+  if (_dd.dateMain && _dd.year) {
+    var _dv = new Date(_dd.dateMain + ', ' + _dd.year);
+    if (!isNaN(_dv.getTime())) {
+      _dv.setDate(_dv.getDate() - 2);
+      var _mN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+      _holdDate = _mN[_dv.getMonth()] + ' ' + _dv.getDate();
+    }
+  }
+  const _holdSentence = _holdDate
+    ? `On ${_holdDate} \u2014 about 48 hours before your delivery \u2014 we'll place a temporary hold on your card. Nothing is charged yet; it just reserves the amount.`
+    : `About 48 hours before your delivery, we'll place a temporary hold on your card. Nothing is charged yet; it just reserves the amount.`;
   return `<div class="card animate-in">
     <div class="card-header"><span class="card-title">Before delivery</span><span class="card-badge badge-scheduled">Hold, not a charge</span></div>
-    <p class="card-body">About 48 hours before your delivery window${when}, we'll place a temporary hold on your card. Nothing is charged yet, it just reserves the amount.</p>
+    <p class="card-body">${_holdSentence}</p>
     <div class="card-row"><span class="card-row-label">First month</span><span class="card-row-value">$${firstMonth.toFixed(2)}<span style="color:var(--text-muted)"> · $25 deposit already applied</span></span></div>
     <div class="card-row"><span class="card-row-label">Furniture deposit</span><span class="card-row-value">$${monthly.toFixed(2)}<span style="color:var(--text-muted)"> · refundable</span></span></div>
     <p class="prep-footnote">The actual charge happens once your furniture is delivered and you've confirmed it arrived. If your delivery is cancelled or doesn't go ahead, the hold is simply released. Your furniture deposit comes back to you at the end of your term, or goes toward your buyout if you decide to keep everything.</p>
