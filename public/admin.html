@@ -1405,10 +1405,38 @@ function netChargedCents(o) {
   let charges = 0, refunds = 0;
   (o.payments || []).forEach(p => {
     if (p.status !== 'succeeded') return;
+    // `pre_auth` is only the authorization HOLD — the real money is recorded
+    // separately as `pre_auth_capture` (rental) or `buy_capture` (purchase)
+    // when it's actually captured. Counting both double-charges the same money,
+    // so skip the hold and only count the capture.
+    if (p.type === 'pre_auth') return;
     if (p.type === 'refund') refunds += Math.abs(p.amountCents || 0);
     else charges += (p.amountCents || 0);
   });
   return charges - refunds;
+}
+
+// The pre-authorization HOLD (1st month + deposit − $25) placed 48h before
+// delivery. It's shown for transparency but never counted as money charged —
+// the real money is the `pre_auth_capture` that settles it. Returns
+// { cents, state } or null. state: 'pending' | 'captured' | 'released'.
+function authHoldInfo(o) {
+  const pays = o.payments || [];
+  const hold = pays.find(p => p.type === 'pre_auth' && (p.amountCents || 0) > 0);
+  if (!hold) return null;
+  const captured = pays.some(p =>
+    (p.type === 'pre_auth_capture' || p.type === 'buy_capture') && p.status === 'succeeded'
+  );
+  let state;
+  if (captured) state = 'captured';
+  else if (o.status === 'cancelled' || o.status === 'refunded') state = 'released';
+  else state = 'pending';
+  return { cents: hold.amountCents || 0, state };
+}
+function holdStateLabel(state) {
+  if (state === 'captured') return 'captured on delivery — settled below';
+  if (state === 'released') return 'released — never charged';
+  return 'held on card — not yet charged';
 }
 
 // Next monthly subscription charge (~30-day cycles from delivery).
@@ -1486,6 +1514,11 @@ function renderBillingSummary(o) {
     ? `<div class="detail-row"><span class="label">Coupon</span><span class="value"><span class="badge badge-green">${escapeHtml(o.couponCode)}</span> ${(o.discountCents||0)>0 ? '−'+formatCurrency(o.discountCents)+'/1st mo' : ''}${(o.bonusFreeMonths||0)>0 ? '+'+o.bonusFreeMonths+' free month'+(o.bonusFreeMonths>1?'s':'')+' at end' : ''}</span></div>`
     : `<div class="detail-row"><span class="label">Coupon</span><span class="value" style="color:var(--text-muted)">None applied</span></div>`;
 
+  const hold = authHoldInfo(o);
+  const holdRow = hold
+    ? `<div class="detail-row"><span class="label">Pre-auth hold</span><span class="value">${formatCurrency(hold.cents)} <span style="color:var(--text-muted);font-size:12px">· ${holdStateLabel(hold.state)}</span></span></div>`
+    : '';
+
   const whenText = nc.whenDate ? formatDate(nc.whenDate) : (nc.when || '—');
   const amountText = nc.amountCents != null ? formatCurrency(nc.amountCents) : '—';
   const nextColor = nc.attention ? 'var(--red)' : 'var(--text)';
@@ -1498,7 +1531,8 @@ function renderBillingSummary(o) {
     <h4 style="margin-top:0">Billing Summary</h4>
     ${requestRow}
     ${couponRow}
-    <div class="detail-row"><span class="label">Charged so far</span><span class="value" style="font-weight:700">${formatCurrency(net)}</span></div>
+    ${holdRow}
+    <div class="detail-row"><span class="label">Charged so far <span style="color:var(--text-muted);font-size:11px;font-weight:400">(actual money)</span></span><span class="value" style="font-weight:700">${formatCurrency(net)}</span></div>
     <div class="detail-row"><span class="label">Next charge</span><span class="value" style="font-weight:700;color:${nextColor}">${amountText}${nc.amountCents!=null ? ' · '+whenText : ''}</span></div>
     <div class="detail-row"><span class="label"></span><span class="value" style="color:var(--text-secondary);font-size:12px">${escapeHtml(nc.label)}</span></div>
     ${nc.note ? `<div class="detail-row"><span class="label"></span><span class="value" style="color:var(--text-muted);font-size:11px">${escapeHtml(nc.note)}</span></div>` : ''}
