@@ -1343,6 +1343,14 @@ function mapApiToBackend(api) {
   const setId = item.setType || 'living';
   const colorSlug = normalizeColorSlug(item.palette || 'hudson-haze');
   const months = item.months || 12;
+  // LOCKED price: whatever the customer actually agreed to at checkout — stored
+  // per item as pricePerMonth (already includes any bundle / promo discount).
+  // The portal must show THIS, never a fresh recompute from the current price
+  // tables, so a later price change or promo never alters an existing plan.
+  const lockedMonthly =
+    (item.pricePerMonth != null && item.pricePerMonth > 0)
+      ? item.pricePerMonth
+      : (api.order && api.order.monthlyRent) || 0;
   // Framer stores excluded items capitalized ("Mattress", "Lamp", "Plant"),
   // so match case-insensitively (and by keyword, e.g. "Floor Lamp").
   const excludedLower = (item.excluded || []).map((x) => String(x).toLowerCase());
@@ -1406,7 +1414,7 @@ function mapApiToBackend(api) {
       email: api.customer.email || '',
       paymentMethod: { brand: 'Visa', last4: '····' }  // card info not in API; will be set when user updates
     },
-    plan: { setId: setId, colorSlug: colorSlug, months: months, omit: omit },
+    plan: { setId: setId, colorSlug: colorSlug, months: months, omit: omit, monthly: lockedMonthly },
     lease: {
       startDateFull: _fmtDate(startDate, 'full'),
       startDateShort: _fmtDate(startDate, 'short'),
@@ -1476,6 +1484,7 @@ function loadPortalData(authHeader) {
         setId: BACKEND.plan.setId,
         colorSlug: BACKEND.plan.colorSlug,
         months: BACKEND.plan.months,
+        monthly: BACKEND.plan.monthly,
         omit: BACKEND.plan.omit
       };
       demoPlan = {
@@ -1653,6 +1662,7 @@ var CONFIRMED_PLAN = {
   setId: BACKEND.plan.setId,
   colorSlug: BACKEND.plan.colorSlug,
   months: BACKEND.plan.months,
+  monthly: BACKEND.plan.monthly,
   omit: BACKEND.plan.omit
 };
 function getPlanForStatus(s) {
@@ -3220,11 +3230,16 @@ switchStatus(_initStatus);
   window.__showOnboard = function(email){ orderEmail = email; show('authOnboard'); };
 
   // ── Preview sandbox: render any status + config with fake data (no login) ──
-  function _tierPrice(set, m, noMat){
-    var T={living:[[10,12,349],[7,9,449],[4,6,549]],dining:[[10,12,249],[7,9,349],[4,6,449]],bedding:[[10,12,199],[7,9,239],[4,6,319]]};
-    var rows=T[set]||T.living, base=rows[0][2];
-    for(var i=0;i<rows.length;i++){ if(m>=rows[i][0] && m<=rows[i][1]){ base=rows[i][2]; break; } }
-    if(set==='bedding' && noMat) base-=70;
+  function _tierPrice(set, m, omit){
+    omit = omit || {};
+    // [minMo, maxMo, base, livingLampDeduction]
+    var T={living:[[10,12,349,20],[7,9,449,30],[4,6,549,35]],dining:[[10,12,249,0],[7,9,349,0],[4,6,449,0]],bedding:[[10,12,199,0],[7,9,239,0],[4,6,319,0]]};
+    var rows=T[set]||T.living, row=rows[0];
+    for(var i=0;i<rows.length;i++){ if(m>=rows[i][0] && m<=rows[i][1]){ row=rows[i]; break; } }
+    var base=row[2];
+    if(set==='living'){ if(omit.noLamp) base-=row[3]; if(omit.noPlant) base-=5; }
+    else if(set==='dining'){ if(omit.noPlant) base-=5; }
+    else if(set==='bedding'){ if(omit.noMattress) base-=70; }
     return base;
   }
   function buildPreviewData(p){
@@ -3236,7 +3251,7 @@ switchStatus(_initStatus);
     if(p.get('mattress')==='0') excluded.push('Mattress');
     if(p.get('lamp')==='0') excluded.push('Lamp');
     if(p.get('plant')==='0') excluded.push('Plant');
-    var monthly=_tierPrice(set,months,excluded.indexOf('Mattress')>=0);
+    var monthly=_tierPrice(set,months,{ noLamp:excluded.indexOf('Lamp')>=0, noPlant:excluded.indexOf('Plant')>=0, noMattress:excluded.indexOf('Mattress')>=0 });
     var now=new Date();
     function plus(days){ var d=new Date(now); d.setDate(d.getDate()+days); return d.toISOString(); }
     var payments=[];
@@ -3257,7 +3272,7 @@ switchStatus(_initStatus);
       var data=buildPreviewData(p);
       _apiData=data;
       BACKEND=mapApiToBackend(data);
-      CONFIRMED_PLAN={ setId:BACKEND.plan.setId, colorSlug:BACKEND.plan.colorSlug, months:BACKEND.plan.months, omit:BACKEND.plan.omit };
+      CONFIRMED_PLAN={ setId:BACKEND.plan.setId, colorSlug:BACKEND.plan.colorSlug, months:BACKEND.plan.months, monthly:BACKEND.plan.monthly, omit:BACKEND.plan.omit };
       demoPlan={ setId:BACKEND.plan.setId, colorSlug:BACKEND.plan.colorSlug, months:6, omit:BACKEND.plan.omit };
       var mF=['January','February','March','April','May','June','July','August','September','October','November','December'];
       var dN=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
