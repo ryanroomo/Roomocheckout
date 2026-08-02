@@ -1388,22 +1388,6 @@ function planImageForStatus(s) {
   if (o.noMattress) return 'images/' + sid + '-' + col + '-no-mattress.png';
   return 'images/' + sid + '-' + col + '-full.png';
 }
-// Image filename for one specific item (used by the multi-set plan list).
-function itemImageSrc(sid, col, o){
-  o = o || {};
-  if (sid === 'living'){
-    if (o.noLamp && o.noPlant) return 'images/'+sid+'-'+col+'-no-lamp-no-plant.png';
-    if (o.noLamp) return 'images/'+sid+'-'+col+'-no-lamp.png';
-    if (o.noPlant) return 'images/'+sid+'-'+col+'-no-plant.png';
-    return 'images/'+sid+'-'+col+'-full.png';
-  }
-  if (sid === 'dining'){
-    if (o.noPlant) return 'images/'+sid+'-'+col+'-no-plant.png';
-    return 'images/'+sid+'-'+col+'-full.png';
-  }
-  if (o.noMattress) return 'images/'+sid+'-'+col+'-no-mattress.png';
-  return 'images/'+sid+'-'+col+'-full.png';
-}
 function planImageBlock(s) {
   const src = planImageForStatus(s);
   const _p = getPlanForStatus ? getPlanForStatus(s) : CONFIRMED_PLAN;
@@ -1448,7 +1432,7 @@ function normalizeColorSlug(raw) {
     'merlot': 'soho-merlot', 'soho merlot': 'soho-merlot', 'soho': 'soho-merlot',
     'almond': 'almond-breeze', 'almond breeze': 'almond-breeze', 'breeze': 'almond-breeze',
     'carbon': 'carbon-black', 'carbon black': 'carbon-black', 'black': 'carbon-black',
-    'color theory': 'color-theory', 'colortheory': 'color-theory', 'theory': 'color-theory'
+    'color theory': 'color-theory', 'theory': 'color-theory'
   };
   return aliasMap[s] || s;
 }
@@ -1512,18 +1496,9 @@ const DEMO_BACKEND = {
 };
 
 // ─── API → BACKEND mapper ────────────────────────────────────────────────────
-// Date-only strings ("2026-08-26") parse as UTC midnight, which displays as the
-// PREVIOUS day in negative-offset timezones (e.g. New York). Force local noon so
-// the calendar day never shifts. Timestamps (with a "T") are left untouched.
-function _localDate(s) {
-  if (!s) return new Date(NaN);
-  s = String(s);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) s += 'T12:00:00';
-  return new Date(s);
-}
 function _fmtDate(iso, style) {
   if (!iso) return '';
-  const d = _localDate(iso);
+  const d = new Date(iso);
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const monthsShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   if (style === 'short') return monthsShort[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
@@ -1538,14 +1513,6 @@ function mapApiToBackend(api) {
   const setId = item.setType || 'living';
   const colorSlug = normalizeColorSlug(item.palette || 'hudson-haze');
   const months = item.months || 12;
-  // LOCKED price: whatever the customer actually agreed to at checkout — stored
-  // per item as pricePerMonth (already includes any bundle / promo discount).
-  // The portal must show THIS, never a fresh recompute from the current price
-  // tables, so a later price change or promo never alters an existing plan.
-  const lockedMonthly =
-    (item.pricePerMonth != null && item.pricePerMonth > 0)
-      ? item.pricePerMonth
-      : (api.order && api.order.monthlyRent) || 0;
   // Framer stores excluded items capitalized ("Mattress", "Lamp", "Plant"),
   // so match case-insensitively (and by keyword, e.g. "Floor Lamp").
   const excludedLower = (item.excluded || []).map((x) => String(x).toLowerCase());
@@ -1595,26 +1562,11 @@ function mapApiToBackend(api) {
   var delivDateMain = '', delivYear = '';
   if (deliveryDate) {
     delivDateMain = _fmtDate(deliveryDate, 'dateMain');
-    delivYear = _localDate(deliveryDate).getFullYear().toString();
+    delivYear = new Date(deliveryDate).getFullYear().toString();
   }
 
   // Address from API (separate fields)
   var ord = api.order || {};
-
-  // All rental items → one plan row each (so multi-set orders list every set).
-  var planItems = (api.items || [])
-    .filter(function(it){ return it.mode !== 'buy-new'; })
-    .map(function(it){
-      var exLower2 = (it.excluded || []).map(function(x){ return String(x).toLowerCase(); });
-      var hx2 = function(kw){ return exLower2.some(function(x){ return x.indexOf(kw) >= 0; }); };
-      return {
-        setId: it.setType || 'living',
-        colorSlug: normalizeColorSlug(it.palette || 'hudson-haze'),
-        months: it.months || 12,
-        omit: { noLamp: hx2('lamp'), noPlant: hx2('plant'), noMattress: hx2('mattress') },
-        monthly: (it.pricePerMonth != null && it.pricePerMonth > 0) ? it.pricePerMonth : 0
-      };
-    });
 
   return {
     _apiStep: api.step,
@@ -1624,8 +1576,7 @@ function mapApiToBackend(api) {
       email: api.customer.email || '',
       paymentMethod: { brand: 'Visa', last4: '····' }  // card info not in API; will be set when user updates
     },
-    plan: { setId: setId, colorSlug: colorSlug, months: months, omit: omit, monthly: lockedMonthly },
-    planItems: planItems,
+    plan: { setId: setId, colorSlug: colorSlug, months: months, omit: omit },
     lease: {
       startDateFull: _fmtDate(startDate, 'full'),
       startDateShort: _fmtDate(startDate, 'short'),
@@ -1696,7 +1647,6 @@ function loadPortalData(authHeader) {
         setId: BACKEND.plan.setId,
         colorSlug: BACKEND.plan.colorSlug,
         months: BACKEND.plan.months,
-        monthly: BACKEND.plan.monthly,
         omit: BACKEND.plan.omit
       };
       demoPlan = {
@@ -1707,7 +1657,7 @@ function loadPortalData(authHeader) {
       };
       // Set delivery date from API for card rendering
       if (data.order && data.order.deliveryDate) {
-        var dd = _localDate(data.order.deliveryDate);
+        var dd = new Date(data.order.deliveryDate);
         var mFull = ['January','February','March','April','May','June','July','August','September','October','November','December'];
         var dNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
         window._deliveryDate = {
@@ -1719,7 +1669,7 @@ function loadPortalData(authHeader) {
       }
       // Set return pickup date from API if return is scheduled
       if (data.order && data.order.returnDate) {
-        var rd = _localDate(data.order.returnDate);
+        var rd = new Date(data.order.returnDate);
         var mFullR = ['January','February','March','April','May','June','July','August','September','October','November','December'];
         var dNamesR = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
         window._returnPickup = {
@@ -1853,20 +1803,13 @@ const STATUS = {
 
 function planCard(s, bc, bt, full=false) {
   const _cp = getPlanForStatus(s);
-  const _items = (BACKEND.planItems && BACKEND.planItems.length) ? BACKEND.planItems : [_cp];
-  const _title = _items.length > 1
-    ? (setLabel(_items[0].setId) + ' Set +' + (_items.length - 1) + ' more')
-    : (setLabel(_cp.setId) + ' Set');
-  const _sub = _items.length > 1
-    ? (_items.length + ' sets')
-    : colorDisplayName(_cp.colorSlug);
   return `<div class="card card-plan-h ${full?'card-full':''} animate-in">
     ${planImageBlock(s)}
     <div class="plan-content">
       <div class="card-header"><span class="card-title">Current Plan</span><span class="card-badge ${bc}">${bt}</span></div>
       <div style="margin-bottom:var(--space-md)">
-        <div style="font-family:var(--font-heading);font-weight:700;font-size:17px;color:var(--text-primary);margin-bottom:8px">${_title}</div>
-        <div style="font-size:13px;color:var(--text-secondary)">${_sub}</div>
+        <div style="font-family:var(--font-heading);font-weight:700;font-size:17px;color:var(--text-primary);margin-bottom:8px">${setLabel(_cp.setId)} Set</div>
+        <div style="font-size:13px;color:var(--text-secondary)">${colorDisplayName(_cp.colorSlug)}</div>
       </div>
       <div style="border-top:1px solid var(--border-light);padding-top:var(--space-md)">
         <div class="card-row"><span class="card-row-label">Next Payment</span><span class="card-row-value">${BACKEND.billing.nextDueDateFull}</span></div>
@@ -1881,7 +1824,6 @@ var CONFIRMED_PLAN = {
   setId: BACKEND.plan.setId,
   colorSlug: BACKEND.plan.colorSlug,
   months: BACKEND.plan.months,
-  monthly: BACKEND.plan.monthly,
   omit: BACKEND.plan.omit
 };
 function getPlanForStatus(s) {
@@ -2027,12 +1969,7 @@ function planDetailCard(s, bc, bt) {
   const opts = s>=5&&s<=7
     ? `<a class="btn btn-secondary" href="#" onclick="openRenewModal();return false;">Extend Rental Term</a><a class="btn btn-secondary" href="#" onclick="openBuyoutFlow();return false;">Buy Out</a><a class="btn btn-ghost" href="#" onclick="openReturnSchedule();return false;">Schedule Return</a>`
     : `<a class="btn btn-ghost" href="https://www.roomonyc.com/support" target="_blank">Contact Support</a>`;
-  const _endShort = window._extendedTerm ? window._extendedTerm.endDate : BACKEND.lease.endDateShort;
-  const _items = (BACKEND.planItems && BACKEND.planItems.length) ? BACKEND.planItems : [_plan];
-
-  // ── Single set: original hero-image layout ──
-  if (_items.length === 1) {
-    return `<div class="card card-plan-h card-full animate-in" style="min-height:320px">
+  return `<div class="card card-plan-h card-full animate-in" style="min-height:320px">
     ${planImageBlock(s)}
     <div class="plan-content">
       <div class="card-header"><span class="card-title">Plan Details</span><span class="card-badge ${bc}">${bt}</span></div>
@@ -2047,7 +1984,7 @@ function planDetailCard(s, bc, bt) {
         </div>
         <div style="padding:var(--space-sm);border-right:1px solid var(--border-light)">
           <div style="font-size:11px;font-weight:500;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Est. End</div>
-          <div style="font-family:var(--font-heading);font-weight:700;font-size:15px;color:var(--text-primary)">${_endShort}</div>
+          <div style="font-family:var(--font-heading);font-weight:700;font-size:15px;color:var(--text-primary)">${window._extendedTerm ? window._extendedTerm.endDate : BACKEND.lease.endDateShort}</div>
         </div>
         <div style="padding:var(--space-sm)">
           <div style="font-size:11px;font-weight:500;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Monthly</div>
@@ -2060,50 +1997,6 @@ function planDetailCard(s, bc, bt) {
       </div>
       <div class="card-actions">${opts}</div>
     </div>
-  </div>`;
-  }
-
-  // ── Multiple sets: list every set with its own image, config and price ──
-  const _total = window._extendedTerm
-    ? window._extendedTerm.monthly
-    : _items.reduce(function(sum,p){ return sum + (planMonthly(p)||0); }, 0);
-  const _rows = _items.map(function(p, i){
-    return `<div style="display:flex;gap:12px;align-items:flex-start;padding:14px 0;${i>0?'border-top:1px solid var(--border-light)':''}">
-      <div style="width:60px;height:60px;border-radius:10px;overflow:hidden;flex-shrink:0;background:var(--bg-primary)">
-        <img src="${imgSrc(itemImageSrc(p.setId,p.colorSlug,p.omit))}" alt="${setLabel(p.setId)} Set" style="width:100%;height:100%;object-fit:contain;display:block"/>
-      </div>
-      <div style="flex:1;min-width:0">
-        <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline">
-          <div style="font-family:var(--font-heading);font-weight:700;font-size:16px;color:var(--text-primary)">${setLabel(p.setId)} Set</div>
-          <div style="font-family:var(--font-heading);font-weight:700;font-size:15px;color:var(--text-primary);white-space:nowrap">$${planMonthly(p)}<span style="font-size:12px;color:var(--text-muted);font-weight:400">/mo</span></div>
-        </div>
-        <div style="font-size:12px;color:var(--text-secondary);margin:2px 0 4px">${colorDisplayName(p.colorSlug)} · ${p.months}-month rental</div>
-        <div style="font-size:12px;color:var(--text-muted);line-height:1.5">${getIncludedItemsList(p)}</div>
-      </div>
-    </div>`;
-  }).join('');
-
-  return `<div class="card card-full animate-in">
-    <div class="card-header"><span class="card-title">Plan Details</span><span class="card-badge ${bc}">${bt}</span></div>
-    <div>${_rows}</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid var(--border-light);border-bottom:1px solid var(--border-light);margin:var(--space-sm) 0 var(--space-md)">
-      <div style="padding:var(--space-sm) var(--space-sm) var(--space-sm) 0;border-right:1px solid var(--border-light)">
-        <div style="font-size:11px;font-weight:500;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Start</div>
-        <div style="font-family:var(--font-heading);font-weight:700;font-size:15px;color:var(--text-primary)">${BACKEND.lease.startDateFull}</div>
-      </div>
-      <div style="padding:var(--space-sm);border-right:1px solid var(--border-light)">
-        <div style="font-size:11px;font-weight:500;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Est. End</div>
-        <div style="font-family:var(--font-heading);font-weight:700;font-size:15px;color:var(--text-primary)">${_endShort}</div>
-      </div>
-      <div style="padding:var(--space-sm)">
-        <div style="font-size:11px;font-weight:500;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Total /mo</div>
-        <div style="font-family:var(--font-heading);font-weight:700;font-size:15px;color:var(--text-primary)">$${_total}</div>
-      </div>
-    </div>
-    <div style="margin-bottom:var(--space-md)">
-      <div style="font-size:12px;color:var(--text-muted);line-height:1.6">Every set includes delivery, assembly, furniture care support, and end-of-term pickup.</div>
-    </div>
-    <div class="card-actions">${opts}</div>
   </div>`;
 }
 function _addr() { return window._address || BACKEND.address; }
@@ -2437,7 +2330,7 @@ async function acctSetPassword() {
   var pass = el ? el.value : '';
   if (!pass || pass.length < 8) { acctShowMsg('Password must be at least 8 characters.', false); return; }
   try {
-    var r = await sb.auth.updateUser({ password: pass, data: { has_password: true } });
+    var r = await sb.auth.updateUser({ password: pass });
     if (r.error) acctShowMsg(r.error.message, false);
     else { acctShowMsg('Password saved. You can now log in with email + password.', true); if (el) el.value = ''; }
   } catch (e) { acctShowMsg(e.message || 'Something went wrong.', false); }
@@ -3821,16 +3714,11 @@ switchStatus(_initStatus);
   window.__showOnboard = function(email){ orderEmail = email; show('authOnboard'); };
 
   // ── Preview sandbox: render any status + config with fake data (no login) ──
-  function _tierPrice(set, m, omit){
-    omit = omit || {};
-    // [minMo, maxMo, base, livingLampDeduction]
-    var T={living:[[10,12,349,20],[7,9,449,30],[4,6,549,35]],dining:[[10,12,249,0],[7,9,349,0],[4,6,449,0]],bedding:[[10,12,199,0],[7,9,239,0],[4,6,319,0]]};
-    var rows=T[set]||T.living, row=rows[0];
-    for(var i=0;i<rows.length;i++){ if(m>=rows[i][0] && m<=rows[i][1]){ row=rows[i]; break; } }
-    var base=row[2];
-    if(set==='living'){ if(omit.noLamp) base-=row[3]; if(omit.noPlant) base-=5; }
-    else if(set==='dining'){ if(omit.noPlant) base-=5; }
-    else if(set==='bedding'){ if(omit.noMattress) base-=70; }
+  function _tierPrice(set, m, noMat){
+    var T={living:[[10,12,349],[7,9,449],[4,6,549]],dining:[[10,12,249],[7,9,349],[4,6,449]],bedding:[[10,12,199],[7,9,239],[4,6,319]]};
+    var rows=T[set]||T.living, base=rows[0][2];
+    for(var i=0;i<rows.length;i++){ if(m>=rows[i][0] && m<=rows[i][1]){ base=rows[i][2]; break; } }
+    if(set==='bedding' && noMat) base-=70;
     return base;
   }
   function buildPreviewData(p){
@@ -3842,7 +3730,7 @@ switchStatus(_initStatus);
     if(p.get('mattress')==='0') excluded.push('Mattress');
     if(p.get('lamp')==='0') excluded.push('Lamp');
     if(p.get('plant')==='0') excluded.push('Plant');
-    var monthly=_tierPrice(set,months,{ noLamp:excluded.indexOf('Lamp')>=0, noPlant:excluded.indexOf('Plant')>=0, noMattress:excluded.indexOf('Mattress')>=0 });
+    var monthly=_tierPrice(set,months,excluded.indexOf('Mattress')>=0);
     var now=new Date();
     function plus(days){ var d=new Date(now); d.setDate(d.getDate()+days); return d.toISOString(); }
     var payments=[];
@@ -3863,12 +3751,12 @@ switchStatus(_initStatus);
       var data=buildPreviewData(p);
       _apiData=data;
       BACKEND=mapApiToBackend(data);
-      CONFIRMED_PLAN={ setId:BACKEND.plan.setId, colorSlug:BACKEND.plan.colorSlug, months:BACKEND.plan.months, monthly:BACKEND.plan.monthly, omit:BACKEND.plan.omit };
+      CONFIRMED_PLAN={ setId:BACKEND.plan.setId, colorSlug:BACKEND.plan.colorSlug, months:BACKEND.plan.months, omit:BACKEND.plan.omit };
       demoPlan={ setId:BACKEND.plan.setId, colorSlug:BACKEND.plan.colorSlug, months:6, omit:BACKEND.plan.omit };
       var mF=['January','February','March','April','May','June','July','August','September','October','November','December'];
       var dN=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-      if(data.order.deliveryDate){ var dd=_localDate(data.order.deliveryDate); window._deliveryDate={dateMain:mF[dd.getMonth()]+' '+dd.getDate(), year:dd.getFullYear().toString(), dayName:dN[dd.getDay()], slot:data.order.deliverySlot}; }
-      if(data.order.returnDate){ var rd=_localDate(data.order.returnDate); window._returnPickup={dateMain:mF[rd.getMonth()]+' '+rd.getDate(), year:rd.getFullYear().toString(), dayName:dN[rd.getDay()], slot:'9:00 AM – 1:00 PM'}; }
+      if(data.order.deliveryDate){ var dd=new Date(data.order.deliveryDate); window._deliveryDate={dateMain:mF[dd.getMonth()]+' '+dd.getDate(), year:dd.getFullYear().toString(), dayName:dN[dd.getDay()], slot:data.order.deliverySlot}; }
+      if(data.order.returnDate){ var rd=new Date(data.order.returnDate); window._returnPickup={dateMain:mF[rd.getMonth()]+' '+rd.getDate(), year:rd.getFullYear().toString(), dayName:dN[rd.getDay()], slot:'9:00 AM – 1:00 PM'}; }
       currentStatus=data.step;
       var sn=document.getElementById('sidebarName'), se=document.getElementById('sidebarEmail');
       if(sn) sn.textContent=BACKEND.user.name; if(se) se.textContent=BACKEND.user.email;
@@ -3945,7 +3833,6 @@ switchStatus(_initStatus);
 
     // 2) Resolve any active session
     var authHeader = null;
-    var hasPassword = false;
     try {
       var s = await sb.auth.getSession();
       if (s.data && s.data.session) {
@@ -3953,16 +3840,13 @@ switchStatus(_initStatus);
         window.__accessToken = s.data.session.access_token;
         orderEmail = orderEmail || s.data.session.user.email;
         window.__sessionEmail = s.data.session.user.email;
-        hasPassword = !!((s.data.session.user.user_metadata || {}).has_password);
       }
     } catch(e){}
 
     // 3) Route
     if (authHeader) {
       loadPortalData(authHeader);
-      // Only first-timers (no password set yet) see the "set a password"
-      // onboarding. Returning users who already have one go straight to portal.
-      if (onboardEmail && !hasPassword) window.__showOnboard(onboardEmail);
+      if (onboardEmail) window.__showOnboard(onboardEmail);
     } else if (token) {
       loadPortalData(null); // legacy token, couldn't mint a session
     } else {
@@ -3992,9 +3876,6 @@ switchStatus(_initStatus);
       var r = await sb.auth.signInWithPassword({ email: email, password: pass });
       this.textContent='Log in'; this.disabled=false;
       if (r.error) { err('loginErr', r.error.message); }
-      // Backfill the flag for accounts created before we tracked it, so the
-      // "set a password" prompt never shows again for a password user.
-      else { try { await sb.auth.updateUser({ data: { has_password: true } }); } catch(e){} }
       // success handled by onAuthStateChange
     });
     $('loginGoogle').addEventListener('click', function(){
@@ -4014,7 +3895,7 @@ switchStatus(_initStatus);
       var pass = $('obPass').value;
       if (!pass || pass.length < 8) { err('obErr','Password must be at least 8 characters.'); return; }
       this.textContent='Saving...'; this.disabled=true;
-      var r = await sb.auth.updateUser({ password: pass, data: { has_password: true } });
+      var r = await sb.auth.updateUser({ password: pass });
       this.textContent='Set password'; this.disabled=false;
       if (r.error) { err('obErr', r.error.message); }
       else { ok('obOk','Password set! You can now log in with email + password.'); setTimeout(function(){ hide('authOnboard'); }, 1400); }

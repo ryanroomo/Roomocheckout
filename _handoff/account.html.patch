@@ -1,0 +1,1163 @@
+diff --git a/public/account.html b/public/account.html
+index 0559c5a..2346b46 100644
+--- a/public/account.html
++++ b/public/account.html
+@@ -36,7 +36,16 @@
+ }
+ *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+ html { font-size: 16px; -webkit-font-smoothing: antialiased; }
+-body { font-family: var(--font-body); font-weight: 400; color: var(--text-primary); background: var(--bg-primary); min-height: 100vh; line-height: 1.2; -webkit-font-smoothing: antialiased; }
++/* Sticky footer: page is a column, main-layout absorbs the slack so the footer
++   always sits at the bottom even when a tab's content is short. */
++body { font-family: var(--font-body); font-weight: 400; color: var(--text-primary); background: var(--bg-primary); min-height: 100vh; min-height: 100svh; line-height: 1.2; -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; }
++/* flex-basis:auto + flex-shrink:0 keeps each band at exactly its own height; without this
++   the column would redistribute space and the hero would render at a partial size. */
++body > .demo-bar, body > .header, body > .hero, body > .loading-shell, body > .footer { flex: 0 0 auto; }
++/* The hero animates its height away; browser scroll anchoring reacts to that by nudging
++   the scroll position, which reads as a bounce. We position the scroll ourselves. */
++body { overflow-anchor: none; }
++body > .main-layout { flex: 1 0 auto; }
+ a { color: var(--text-secondary); text-decoration: none; transition: color 0.2s var(--ease-out); }
+ a:hover { color: var(--text-primary); text-decoration: underline; }
+ 
+@@ -61,8 +70,9 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+ 
+ /* Hero */
+ .hero { position: relative; height: 240px; overflow: hidden; display: flex; align-items: center; }
+-.hero-bg { position: absolute; inset: 0; background-size: cover; background-position: center 40%; background-image: linear-gradient(135deg, #c4a882 0%, #8b7355 30%, #6b5b4a 60%, #4a3f35 100%); }
+-.hero-bg::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(74,55,43,0.7) 0%, rgba(61,52,47,0.5) 100%); }
++.hero-bg { position: absolute; inset: 0; background-size: cover; background-position: center 55%; background-repeat: no-repeat; background-color: #6b5b4a; background-image: url('/images/hero-draped-bed-wide.jpg'); }
++/* Scrim keeps the label, headline and buttons legible over the photograph. */
++.hero-bg::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(58,44,34,0.34) 0%, rgba(58,44,34,0.52) 55%, rgba(46,35,27,0.72) 100%); }
+ .hero-content { position: relative; z-index: 2; padding: var(--space-2xl) var(--space-2xl) var(--space-2xl) calc(280px + var(--space-2xl)); max-width: 900px; }
+ .hero-label { font-family: var(--font-body); font-weight: 400; font-size: 10px; text-transform: uppercase; letter-spacing: 0; color: rgba(249,245,241,0.5); margin-bottom: var(--space-sm); }
+ .hero-title { font-family: var(--font-heading); font-weight: 500; font-size: 32px; line-height: 1.15; color: var(--text-on-hero); margin-bottom: var(--space-md); letter-spacing: 0; }
+@@ -72,6 +82,12 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+ .hero-links { margin-top: var(--space-md); display: flex; gap: var(--space-lg); flex-wrap: wrap; }
+ .hero-links a { color: rgba(255,255,255,0.6); font-size: 12px; font-weight: 400; letter-spacing: 0; }
+ .hero-links a:hover { color: #fff; text-decoration: underline; }
++/* Collapsed hero → compact sticky status bar (mobile only) */
++.hero-minibar { display: none; }
++.hero-scroll-hint { display: none; position: absolute; left: 50%; bottom: var(--space-lg); transform: translateX(-50%); z-index: 2; flex-direction: column; align-items: center; gap: 2px; background: none; border: none; padding: var(--space-xs); cursor: pointer; color: rgba(249,245,241,0.65); }
++.hero-scroll-hint span { font-family: var(--font-body); font-size: 10px; text-transform: uppercase; letter-spacing: 0.02em; }
++.hero-scroll-hint svg { animation: heroScrollBounce 1.6s ease-in-out infinite; }
++@keyframes heroScrollBounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(5px); } }
+ 
+ /* Layout */
+ .main-layout { display: flex; min-height: calc(100vh - 340px - 60px); }
+@@ -82,7 +98,12 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+ .nav-item.active { background: var(--bg-secondary); color: var(--text-primary); font-weight: 400; }
+ .nav-icon { display: none; }
+ .nav-badge { margin-left: auto; background: var(--text-primary); color: var(--text-inverse); font-size: 10px; font-weight: 400; padding: 2px 8px; border-radius: var(--radius-pill); }
+-.content-area { flex: 1; padding: var(--space-2xl); background: var(--bg-primary); overflow-y: auto; }
++.content-area { flex: 1; min-width: 0; padding: var(--space-2xl); background: var(--bg-primary); overflow-y: auto; }
++.nav-toggle { display: none; align-items: center; gap: 6px; flex-shrink: 0; background: var(--bg-secondary); border: none; border-radius: var(--radius-pill); cursor: pointer; padding: 6px 12px 6px 14px; font-family: var(--font-body); font-weight: 500; font-size: 11px; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0; box-sizing: border-box; }
++.nav-toggle-left { display: flex; align-items: center; gap: 6px; }
++.sidebar-profile-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); width: 100%; }
++.nav-toggle-chevron { transition: transform 0.2s var(--ease-out); flex-shrink: 0; }
++.sidebar.nav-open .nav-toggle-chevron { transform: rotate(180deg); }
+ 
+ /* Sidebar user */
+ .sidebar-profile { padding: var(--space-lg) clamp(12px, 4vw, 128px) 0; }
+@@ -99,8 +120,8 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+ .sidebar-signout-mobile:hover { color: var(--text-primary); text-decoration: none; }
+ 
+ /* Cards */
+-.cards-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-lg); }
+-.card { background: var(--bg-secondary); border-radius: var(--radius-lg); padding: var(--space-lg); border: none; transition: all 0.25s var(--ease-out); display: flex; flex-direction: column; }
++.cards-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-lg); }
++.card { background: var(--bg-secondary); border-radius: var(--radius-lg); padding: var(--space-lg); border: none; transition: all 0.25s var(--ease-out); display: flex; flex-direction: column; min-width: 0; }
+ .card:hover { box-shadow: none; }
+ .card-full { grid-column: 1 / -1; }
+ .card-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: var(--space-md); margin-bottom: var(--space-md); margin-left: calc(-1 * var(--space-lg)); margin-right: calc(-1 * var(--space-lg)); padding-left: var(--space-lg); padding-right: var(--space-lg); border-bottom: 1px solid var(--border-light); }
+@@ -113,9 +134,9 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+ .badge-completed { background: transparent; color: var(--text-muted); }
+ .badge-draft { background: transparent; color: var(--text-muted); }
+ .badge-confirmed { background: rgba(78,93,70,0.1); color: #3a5a2a; border-color: rgba(78,93,70,0.2); }
+-.card-row { display: flex; justify-content: space-between; padding: 0; font-size: 13px; border-bottom: none; }
+-.card-row-label { color: var(--text-muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0; }
+-.card-row-value { color: var(--text-primary); font-weight: 400; text-align: right; font-size: 13px; }
++.card-row { display: flex; justify-content: space-between; gap: var(--space-md); padding: 0; font-size: 13px; border-bottom: none; }
++.card-row-label { color: var(--text-muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0; flex-shrink: 0; }
++.card-row-value { color: var(--text-primary); font-weight: 400; text-align: right; font-size: 13px; min-width: 0; overflow-wrap: anywhere; }
+ .card-body { font-size: 13px; color: #816E68; line-height: 1.2; margin-bottom: var(--space-md); }
+ .card-actions { display: flex; gap: var(--space-sm); margin-top: auto; padding-top: var(--space-lg); flex-wrap: wrap; justify-content: flex-end; }
+ 
+@@ -153,9 +174,11 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+ .btn-warn:hover { background: #3a2920; border-color: #3a2920; color: var(--btn-primary-text); }
+ 
+ /* Modal */
+-.modal-overlay { position: fixed; inset: 0; background: rgba(73,55,42,0.35); z-index: 200; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
++/* Overlay padding is what guarantees a gutter on small screens — flex items shrink
++   past their max-width, so relying on max-width alone lets modals hit the edges. */
++.modal-overlay { position: fixed; inset: 0; background: rgba(73,55,42,0.35); z-index: 200; display: flex; align-items: center; justify-content: center; padding: var(--space-lg); opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+ .modal-overlay.open { opacity: 1; pointer-events: all; }
+-.modal { background: var(--bg-primary); border-radius: var(--radius-lg); padding: var(--space-xl); width: 480px; max-width: 90vw; box-shadow: 0 24px 64px rgba(73,55,42,0.18); transform: translateY(12px); transition: transform 0.25s var(--ease-out); }
++.modal { background: var(--bg-primary); border-radius: var(--radius-lg); padding: var(--space-xl); width: 480px; max-width: 100%; margin: auto; max-height: calc(100vh - 2 * var(--space-lg)); overflow-y: auto; box-shadow: 0 24px 64px rgba(73,55,42,0.18); transform: translateY(12px); transition: transform 0.25s var(--ease-out); }
+ .modal-overlay.open .modal { transform: translateY(0); }
+ .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-lg); }
+ .modal-title { font-family: var(--font-heading); font-weight: 700; font-size: 18px; color: var(--text-primary); }
+@@ -190,10 +213,11 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+ .step-desc { font-size: 12px; color: #816E68; line-height: 1; font-weight: 400; }
+ 
+ /* Table */
+-.table-wrap { overflow-x: auto; }
++.table-wrap { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
+ .table-minimal { width: 100%; border-collapse: collapse; font-size: 13px; }
+ .table-minimal th { text-align: left; font-weight: 500; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0; padding: var(--space-sm) var(--space-md); border-bottom: 1px solid var(--border-light); }
+ .table-minimal td { padding: 10px var(--space-md); border-bottom: 1px solid var(--border-light); color: #816E68; }
++.table-minimal td:first-child, .table-minimal th:first-child { white-space: nowrap; }
+ .table-minimal tr:last-child td { border-bottom: none; }
+ 
+ /* Support */
+@@ -202,6 +226,32 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+ .support-item:hover { border-color: var(--border-medium); background: var(--bg-card-hover); color: var(--text-primary); }
+ 
+ /* Toggle */
++/* Destructive text links (cancel order) */
++.link-danger { font-family: var(--font-body); font-size: 12px; color: #a03020; text-decoration: underline; }
++.link-danger:hover { color: #7d2418; text-decoration: underline; }
++/* On the dark hero the same red is lifted so it stays legible while still reading as red */
++.link-danger-hero { font-family: var(--font-body); font-size: 12px; color: #e09280; text-decoration: underline; }
++.link-danger-hero:hover { color: #f0b0a0; text-decoration: underline; }
++/* Warm intro strip above the pre-delivery cards */
++.welcome-note { grid-column: 1 / -1; background: var(--bg-primary); border: 1px solid var(--border-light); border-radius: var(--radius-lg); padding: var(--space-lg) var(--space-xl); }
++.welcome-note-title { display: flex; align-items: center; gap: 10px; font-family: var(--font-heading); font-weight: 700; font-size: 18px; color: var(--text-primary); margin-bottom: 10px; }
++.welcome-note-icon { flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; background: var(--bg-secondary); display: inline-flex; align-items: center; justify-content: center; color: var(--accent-olive); }
++.welcome-note-copy { font-size: 13px; color: var(--text-secondary); line-height: 1.25; max-width: 62ch; }
++/* Pre-delivery checklist */
++.prep-item { display: flex; gap: var(--space-md); padding: var(--space-md) 0; }
++.prep-item + .prep-item { border-top: 1px solid var(--border-light); }
++.prep-check { flex-shrink: 0; width: 22px; height: 22px; margin-top: 1px; border-radius: 6px; border: 1.5px solid var(--border-medium); background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; transition: all 0.18s var(--ease-out); }
++.prep-check svg { opacity: 0; transform: scale(0.6); transition: all 0.18s var(--ease-out); }
++.prep-item.is-done .prep-check { background: var(--accent-olive); border-color: var(--accent-olive); }
++.prep-item.is-done .prep-check svg { opacity: 1; transform: none; }
++.prep-body { min-width: 0; flex: 1; }
++.prep-title { font-family: var(--font-heading); font-weight: 700; font-size: 14px; color: var(--text-primary); margin-bottom: 10px; }
++.prep-item.is-done .prep-title { color: var(--text-muted); }
++.prep-copy { font-size: 13px; color: var(--text-secondary); line-height: 1.25; }
++.prep-link { font-size: 12px; color: var(--text-secondary); text-decoration: underline; margin-top: 8px; display: inline-block; }
++.prep-link:hover { color: var(--text-primary); text-decoration: underline; }
++.prep-footnote { margin-top: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--border-light); font-size: 12px; color: var(--text-secondary); line-height: 1.25; }
++.prep-progress { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0; }
+ .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: var(--space-md) 0; }
+ .toggle-track { width: 44px; height: 24px; border-radius: 12px; background: var(--border-medium); position: relative; cursor: pointer; transition: background 0.2s; }
+ .toggle-track.on { background: var(--accent-olive); }
+@@ -293,31 +343,121 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+ @media (max-width: 768px) {
+   :root { --radius-lg: 24px; }
+   .main-layout { flex-direction: column; }
+-  .sidebar { width: 100%; min-width: 100%; border-right: none; border-bottom: 1px solid var(--border-light); padding: 0; flex-direction: column; }
+-  .sidebar-profile { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--space-lg); padding: var(--space-lg) var(--space-lg) 0; }
+-  .sidebar-profile-name { font-size: 18px; }
+-  .sidebar-profile-email { flex: 1; }
++  .sidebar { position: sticky; top: calc(var(--mobile-demo-bar-height, 0px) + var(--top-chrome-h, 56px)); z-index: 40; overflow: visible; width: 100%; min-width: 100%; border-right: none; border-bottom: none; padding: 0; flex-direction: column; background: var(--bg-primary); }
++  .sidebar.is-stuck { box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
++  /* Fixed height so the pinned row is identical whether or not it is stuck — a row that
++     changes height as you scroll makes the content below jump. */
++  .sidebar-profile { display: flex; align-items: center; height: 54px; padding: 0 var(--space-lg); gap: var(--space-md); }
++  .sidebar-profile-name { font-size: 16px; margin-bottom: 0; }
++  .sidebar-profile-email { display: none; }
+   .sidebar-user { display: none; }
+   .sidebar-signout-mobile { display: block; }
+-  .sidebar-profile { padding: var(--space-md) var(--space-lg) var(--space-sm); }
+-  .sidebar-profile-divider { margin: var(--space-sm) 0; }
+-  .nav-list { display: flex; flex-wrap: wrap; justify-content: flex-start; padding: var(--space-xs) var(--space-sm) var(--space-sm); gap: 2px; overflow-x: visible; }
+-  .nav-item { white-space: nowrap; border-left: none; border-bottom: none; padding: var(--space-sm) var(--space-md); font-size: 11px; border-radius: var(--radius-sm); margin: 0; }
++  .sidebar-profile-divider { margin: 0; }
++  .nav-toggle { display: flex; }
++  .nav-list { position: absolute; top: 100%; left: 0; right: 0; flex-direction: column; flex-wrap: nowrap; padding: 0; gap: 0; max-height: 0; overflow: hidden; opacity: 0; pointer-events: none; background: var(--bg-primary); box-shadow: 0 12px 24px rgba(0,0,0,0.08); border-bottom: 1px solid var(--border-light); transition: max-height 0.22s var(--ease-out), opacity 0.18s var(--ease-out); }
++  .sidebar.nav-open .nav-list { max-height: 420px; opacity: 1; pointer-events: auto; }
++  .nav-item { white-space: nowrap; border-left: none; padding: var(--space-md) var(--space-lg); font-size: 13px; border-radius: 0; margin: 0; width: 100%; box-sizing: border-box; border-bottom: 1px solid var(--border-light); }
++  .nav-item:last-child { border-bottom: none; }
+   .nav-item.active { background: var(--bg-secondary); }
+-  .hero { height: 280px; }
+-  .hero-content { padding: var(--space-lg); }
++  /* Collapse via max-height, not height. Animating height to and from a calc() value
++     was landing on intermediate sizes when the two directions overlapped; with height
++     pinned to the full size, the only thing that moves is the cap, so the hero is always
++     either exactly full-screen or exactly zero. */
++  .hero {
++    height: calc(100svh - 56px - var(--mobile-demo-bar-height, 0px));
++    min-height: 0;
++    max-height: calc(100svh - 56px - var(--mobile-demo-bar-height, 0px));
++    padding-bottom: 0;
++    transition: max-height 0.42s var(--ease-out), opacity 0.28s ease;
++  }
++  .hero-bg { background-position: center 62%; }
++  .hero-content { width: 100%; padding: var(--space-lg); transition: opacity 0.2s ease, transform 0.32s var(--ease-out); }
++  .hero.is-collapsed { max-height: 0; opacity: 0; pointer-events: none; }
++  .hero.is-collapsed .hero-content { opacity: 0; transform: translateY(-16px); }
++  .hero.is-collapsed .hero-scroll-hint { opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(8px); }
+   .hero-title { font-size: 28px; }
+-  .cards-grid { grid-template-columns: 1fr; }
++  .hero-scroll-hint { display: flex; position: fixed; left: 50%; bottom: var(--space-md); transform: translateX(-50%); background: var(--btn-primary-bg); color: var(--text-inverse); border-radius: var(--radius-pill); padding: 8px 18px 8px 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.22); flex-direction: row; gap: 6px; z-index: 90; opacity: 1; transition: opacity 0.2s var(--ease-out), transform 0.2s var(--ease-out); }
++  .hero-scroll-hint.is-hidden { opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(8px); }
++  .hero-scroll-hint svg { animation: none; }
++
++  /* ── Compact status bar shown once the full-screen hero is out of view ── */
++  /* Lives inside the sticky sidebar, so the bar and the profile row are one block and
++     can never overlap — no height measurement or magic offsets involved. */
++  .hero-minibar {
++    display: flex; align-items: center; gap: var(--space-md);
++    max-height: 0; overflow: hidden; padding: 0 var(--space-lg); opacity: 0; pointer-events: none;
++    background: var(--minibar-bg, #4a3f35); color: var(--text-on-hero);
++    transition: max-height 0.28s var(--ease-out), padding 0.28s var(--ease-out), opacity 0.2s ease, background 0.3s ease;
++  }
++  .hero-minibar.is-visible { max-height: 96px; padding: 9px var(--space-lg); opacity: 1; pointer-events: auto; }
++  /* The compact bar replaces the ROOMO header rather than stacking under it. */
++  .header { top: var(--mobile-demo-bar-height, 0px); }
++  /* Collapse the header out of the layout, not just out of sight — leaving its 56px
++     in flow showed as a blank band above the compact bar. */
++  .header { overflow: hidden; transition: height 0.28s var(--ease-out), min-height 0.28s var(--ease-out), opacity 0.2s ease; }
++  /* min-height:0 is essential — body is a column flex container, and flex items default
++     to min-height:auto, which floors them at their content height and ignores height:0. */
++  body.minibar-on .header { height: 0; min-height: 0; opacity: 0; pointer-events: none; border-bottom-color: transparent; }
++  /* Once the compact bar is up, the profile row shrinks to just the nav button so the
++     pinned chrome stays as short as possible. */
++  .hero-minibar-main {
++    flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px;
++    background: none; border: none; padding: 0; margin: 0; cursor: pointer;
++    color: inherit; text-align: left; font-family: var(--font-body);
++  }
++  .hero-minibar-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: var(--minibar-dot, #9eb1bb); }
++  .hero-minibar-text { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
++  .hero-minibar-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em; color: rgba(249,245,241,0.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
++  .hero-minibar-hint { font-size: 12px; color: rgba(249,245,241,0.92); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
++  .hero-minibar-chevron { flex-shrink: 0; opacity: 0.55; }
++  .hero-minibar-cta {
++    flex-shrink: 0; background: #F9F5F1; color: var(--text-primary);
++    font-family: var(--font-body); font-weight: 500; font-size: 10px; text-transform: uppercase;
++    padding: 7px 15px; border-radius: var(--radius-pill); border: none; cursor: pointer;
++    text-decoration: none; white-space: nowrap;
++  }
++  .hero-minibar-cta:hover { color: var(--text-primary); text-decoration: none; }
++  /* Scroll snapping: cards settle just under the pinned chrome instead of stopping
++     halfway. "proximity" (not "mandatory") so ordinary scrolling still feels free. */
++  :root { --chrome-total: calc(var(--mobile-demo-bar-height, 0px) + var(--top-chrome-h, 56px) + var(--sidebar-h, 0px)); }
++  html { scroll-snap-type: y proximity; scroll-padding-top: var(--chrome-total); }
++  body { scroll-snap-type: y proximity; }
++  /* Snapping re-runs whenever the document height changes. While the hero folds or
++     unfolds that drags the page onto a card and the hero ends up half off-screen, so
++     snapping is suspended for the duration of the transition. */
++  html.no-snap, html.no-snap body { scroll-snap-type: none; }
++  .cards-grid > .card, .cards-grid > .welcome-note, .content-area > .empty-state {
++    scroll-snap-align: start; scroll-snap-stop: normal; scroll-margin-top: var(--chrome-total);
++  }
++  .modal-overlay { padding: var(--space-md); }
++  .modal { padding: var(--space-lg); max-height: calc(100svh - 2 * var(--space-md)); }
++  .modal-actions { flex-wrap: wrap; }
++  .cards-grid { grid-template-columns: minmax(0, 1fr); }
++  .main-layout, .sidebar, .content-area { min-width: 0; max-width: 100%; }
+   .steps { grid-template-columns: repeat(2, 1fr); }
+   .support-grid { grid-template-columns: 1fr; }
+-  .header { padding: var(--space-md); }
++  .header { height: 56px; padding: 0 var(--space-lg); }
+   .header-nav { position: static; transform: none; gap: var(--space-lg); }
+   .header-nav a { font-size: 11px; }
+-  .card-plan-h { flex-direction: column; }
+-  .card-plan-h .plan-image-area { width: 100%; aspect-ratio: 4/3; padding: 0; border-right: none; border-bottom: 1px solid var(--border-light); }
++  .footer { padding: var(--space-xl) var(--space-lg) var(--space-lg); }
++  .card-plan-h { display: grid; grid-template-columns: 1fr; }
++  .card-plan-h .plan-content { display: contents; }
++  .card-plan-h .card-header { grid-row: 1; margin: 0; padding: var(--space-lg); }
++  .card-plan-h .plan-image-area { grid-row: 2; width: 100%; aspect-ratio: 4/3; padding: 0; border-right: none; border-bottom: 1px solid var(--border-light); }
+   .card-plan-h .plan-image-frame { width: 100%; height: 100%; min-height: 0; flex: 1; }
+-  .card-plan-h .plan-content { padding: var(--space-lg); }
+-  .content-area { padding: var(--space-lg); }
++  .card-plan-h .plan-content > .card-header ~ * { margin-left: var(--space-lg) !important; margin-right: var(--space-lg) !important; }
++  .card-plan-h .plan-content > .card-header + * { margin-top: var(--space-lg) !important; }
++  .card-plan-h .plan-content > :last-child { margin-bottom: var(--space-lg) !important; }
++  /* Let the browser park the content below the pinned chrome. --sidebar-h and
++     --top-chrome-h are kept current in JS, so scrollIntoView always lands right. */
++  .content-area {
++    padding: var(--space-lg) var(--space-lg) var(--space-lg);
++    scroll-margin-top: var(--chrome-total);
++    /* Must not be its own scroll container on mobile: the cards would then belong to
++       its scrollport instead of the page's, and the page-level snap would find no
++       targets. The whole page scrolls here anyway. */
++    overflow: visible;
++  }
+   .delivery-split { flex-direction: column; }
+   .delivery-date-block { border-right: none; border-bottom: 1px solid var(--border-light); min-width: auto; padding: var(--space-lg); }
+   .delivery-meta { padding: var(--space-lg); }
+@@ -375,44 +515,67 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+ <section class="hero" id="heroBanner">
+   <div class="hero-bg"></div>
+   <div class="hero-content" id="heroContent"></div>
++  <button class="hero-scroll-hint" id="heroScrollHint" onclick="scrollToOverview()" aria-label="Scroll to overview">
++    <span>Overview</span>
++    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="6 9 12 15 18 9"/></svg>
++  </button>
+ </section>
+ 
+ <div class="main-layout">
+   <nav class="sidebar">
++    <!-- Compact status bar: appears when the full-screen hero is collapsed / scrolled past (mobile) -->
++    <div class="hero-minibar" id="heroMinibar" aria-hidden="true">
++      <button class="hero-minibar-main" id="heroMinibarExpand" onclick="expandHero()" aria-label="Show full status">
++        <span class="hero-minibar-dot"></span>
++        <span class="hero-minibar-text">
++          <span class="hero-minibar-label" id="heroMinibarLabel"></span>
++          <span class="hero-minibar-hint" id="heroMinibarHint"></span>
++        </span>
++        <svg class="hero-minibar-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="18 15 12 9 6 15"/></svg>
++      </button>
++      <a class="hero-minibar-cta" id="heroMinibarCta" href="#"></a>
++    </div>
+     <div class="sidebar-profile">
+-      <div style="display:flex;align-items:baseline;justify-content:space-between;width:100%">
++      <div class="sidebar-profile-row">
+         <div class="sidebar-profile-name" contenteditable="true" spellcheck="false" id="sidebarName">Alex Chen</div>
++        <button class="nav-toggle" id="navToggle" onclick="toggleNavMenu()" aria-expanded="false" aria-controls="navList" aria-label="Menu">
++          <span class="nav-toggle-left">
++            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
++            <span id="navToggleLabel">Overview</span>
++          </span>
++          <svg class="nav-toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="6 9 12 15 18 9"/></svg>
++        </button>
+       </div>
+       <div class="sidebar-profile-email" id="sidebarEmail">alex.chen@gmail.com</div>
+     </div>
+     <div class="sidebar-profile-divider"></div>
+     <ul class="nav-list" id="navList">
+-      <li class="nav-item active" data-tab="overview" onclick="switchTab('overview')">
++      <li class="nav-item active" data-tab="overview" onclick="switchTab('overview');alignContentTop()">
+         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+         Overview
+       </li>
+-      <li class="nav-item" data-tab="plan" onclick="switchTab('plan')">
++      <li class="nav-item" data-tab="plan" onclick="switchTab('plan');alignContentTop()">
+         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+         Current Plan
+       </li>
+-      <li class="nav-item" data-tab="delivery" onclick="switchTab('delivery')">
++      <li class="nav-item" data-tab="delivery" onclick="switchTab('delivery');alignContentTop()">
+         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10m10 0H3m10 0h4m0 0a3 3 0 11-6 0m6 0h1a1 1 0 001-1v-3.28a1 1 0 00-.684-.948l-3.5-1.167A1 1 0 0013 11.28V16m-7 0a3 3 0 11-6 0"/></svg>
+         Delivery
+       </li>
+-      <li class="nav-item" data-tab="billing" onclick="switchTab('billing')">
++      <li class="nav-item" data-tab="billing" onclick="switchTab('billing');alignContentTop()">
+         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+         Billing
+         <span class="nav-badge" id="billingBadge" style="display:none">!</span>
+       </li>
+-      <li class="nav-item" data-tab="history" onclick="switchTab('history')">
++      <li class="nav-item" data-tab="history" onclick="switchTab('history');alignContentTop()">
+         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+         Order History
+       </li>
+-      <li class="nav-item" data-tab="support" onclick="switchTab('support')">
++      <li class="nav-item" data-tab="support" onclick="switchTab('support');alignContentTop()">
+         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+         Support
+       </li>
+-      <li class="nav-item" data-tab="account" onclick="switchTab('account')">
++      <li class="nav-item" data-tab="account" onclick="switchTab('account');alignContentTop()">
+         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 016-6h4a6 6 0 016 6v1"/></svg>
+         Account
+       </li>
+@@ -544,7 +707,7 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+         <div class="card-row"><span class="card-row-label">Term</span><span class="card-row-value" id="checkoutTerm">6 months</span></div>
+         <div class="card-row" style="border-top:1px solid var(--border-light);padding-top:var(--space-sm);margin-top:var(--space-sm)"><span class="card-row-label" style="font-weight:600;color:var(--text-primary)">Monthly</span><span class="card-row-value" style="font-family:var(--font-heading);font-weight:700;font-size:17px" id="checkoutMonthly">$349 / month</span></div>
+         <div class="card-row"><span class="card-row-label">Refundable deposit</span><span class="card-row-value" id="checkoutDeposit">$25</span></div>
+-        <p style="font-size:11px;color:var(--text-muted);line-height:1.35;margin-top:var(--space-sm)">$25 refundable deposit, applied to your first month. Fully refundable until your delivery is scheduled.</p>
++        <p style="font-size:11px;color:var(--text-muted);line-height:1.25;margin-top:var(--space-sm)">$25 refundable deposit, applied to your first month. Fully refundable until your delivery is scheduled.</p>
+       </div>
+       <div style="font-family:var(--font-heading);font-weight:700;font-size:14px;color:var(--text-primary);margin-bottom:var(--space-md)">Payment Method</div>
+       <div class="pay-field">
+@@ -714,7 +877,7 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+           </svg>
+         </div>
+         <div style="font-family:var(--font-heading);font-weight:700;font-size:22px;color:var(--text-primary);margin-bottom:var(--space-sm)">Pickup Scheduled!</div>
+-        <p id="returnConfirmText" style="font-size:14px;color:var(--text-secondary);line-height:1.5;margin-bottom:var(--space-lg)"></p>
++        <p id="returnConfirmText" style="font-size:14px;color:var(--text-secondary);line-height:1.25;margin-bottom:var(--space-lg)"></p>
+         <div class="card" style="text-align:left;margin-bottom:var(--space-lg);padding:var(--space-md)">
+           <div class="card-row" style="margin-bottom:0"><span class="card-row-label">Date</span><span class="card-row-value" id="returnConfirmDate"></span></div>
+           <div class="card-row" style="margin-bottom:0"><span class="card-row-label">Time</span><span class="card-row-value" id="returnConfirmSlot"></span></div>
+@@ -762,7 +925,7 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3a5a2a" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+       </div>
+       <div style="font-family:var(--font-heading);font-weight:700;font-size:20px;color:var(--text-primary);margin-bottom:var(--space-sm)">Plan Renewed!</div>
+-      <p id="renewSuccessMsg" style="font-size:14px;color:var(--text-secondary);line-height:1.5;margin-bottom:var(--space-lg)"></p>
++      <p id="renewSuccessMsg" style="font-size:14px;color:var(--text-secondary);line-height:1.25;margin-bottom:var(--space-lg)"></p>
+       <a class="btn btn-primary" href="#" onclick="closeRenewModal();return false;" style="width:100%;justify-content:center">Done</a>
+     </div>
+   </div>
+@@ -776,7 +939,7 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a03020" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+       </div>
+       <div style="font-family:var(--font-heading);font-weight:700;font-size:20px;color:var(--text-primary);margin-bottom:var(--space-sm)">Retry Payment?</div>
+-      <p style="font-size:14px;color:var(--text-secondary);line-height:1.5;margin-bottom:var(--space-lg)" id="tryAgainDesc">We'll attempt to charge $349.00 to your Visa ending in 1234. Make sure your payment details are up to date before retrying.</p>
++      <p style="font-size:14px;color:var(--text-secondary);line-height:1.25;margin-bottom:var(--space-lg)" id="tryAgainDesc">We'll attempt to charge $349.00 to your Visa ending in 1234. Make sure your payment details are up to date before retrying.</p>
+       <div class="card" style="text-align:left;margin-bottom:var(--space-lg);padding:var(--space-md)">
+         <div class="card-row" style="margin-bottom:0"><span class="card-row-label">Card</span><span class="card-row-value" id="tryAgainCard">Visa ···· 1234</span></div>
+         <div class="card-row" style="margin-bottom:0"><span class="card-row-label">Amount</span><span class="card-row-value" id="tryAgainAmount">$349.00</span></div>
+@@ -792,7 +955,7 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3a5a2a" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+       </div>
+       <div style="font-family:var(--font-heading);font-weight:700;font-size:20px;color:var(--text-primary);margin-bottom:var(--space-sm)">Payment Successful</div>
+-      <p style="font-size:14px;color:var(--text-secondary);line-height:1.5;margin-bottom:var(--space-lg)" id="tryAgainSuccessMsg">Your payment of $349.00 has been processed. Your Roomo plan is back on track.</p>
++      <p style="font-size:14px;color:var(--text-secondary);line-height:1.25;margin-bottom:var(--space-lg)" id="tryAgainSuccessMsg">Your payment of $349.00 has been processed. Your Roomo plan is back on track.</p>
+       <a class="btn btn-primary" href="#" onclick="closeTryAgainModal();return false;" style="width:100%;justify-content:center">Done</a>
+     </div>
+   </div>
+@@ -812,18 +975,24 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+         <div style="font-size:14px;color:var(--text-secondary);margin-bottom:var(--space-md)" id="cdSlotDisplay">10:00 AM – 2:00 PM</div>
+         <div class="card-row" style="margin-bottom:0"><span class="card-row-label">Address</span><span class="card-row-value" id="cdAddrDisplay">245 E 24th St, Apt 4B</span></div>
+       </div>
+-      <p style="font-size:13px;color:var(--text-secondary);line-height:1.5;margin-bottom:var(--space-lg)">Your delivery team will arrive during the window above to set up your furniture. You don't need to do anything — just be home.</p>
++      <p style="font-size:13px;color:var(--text-secondary);line-height:1.25;margin-bottom:var(--space-md)" id="cdCopy">Your delivery team will arrive during the window above to set up your furniture. You don't need to do anything — just be home.</p>
++      <div style="display:flex;gap:var(--space-lg);margin-bottom:var(--space-lg)">
++        <a href="#" onclick="cdReschedule();return false;" style="font-size:12px;color:var(--text-secondary);text-decoration:underline">Change date or time</a>
++        <a href="#" onclick="cdChangeAddress();return false;" style="font-size:12px;color:var(--text-secondary);text-decoration:underline">Change address</a>
++      </div>
+       <div class="modal-actions">
+-        <a class="btn btn-ghost" href="#" onclick="cdReschedule();return false;">Reschedule</a>
+-        <a class="btn btn-primary" href="#" onclick="cdConfirm();return false;">Confirm Delivery</a>
++        <a class="btn btn-primary" href="#" onclick="cdConfirm();return false;" id="cdConfirmBtn">Confirm Delivery</a>
+       </div>
+     </div>
+     <div id="cdStep2" style="display:none;text-align:center;padding:var(--space-xl) 0">
+       <div style="width:64px;height:64px;margin:0 auto var(--space-lg);background:rgba(78,93,70,0.1);border-radius:50%;display:flex;align-items:center;justify-content:center">
+         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3a5a2a" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+       </div>
+-      <div style="font-family:var(--font-heading);font-weight:700;font-size:22px;color:var(--text-primary);margin-bottom:var(--space-sm)">Delivery Confirmed</div>
+-      <p style="font-size:14px;color:var(--text-secondary);line-height:1.5;margin-bottom:var(--space-xl)" id="cdSuccessMsg">Your delivery is confirmed. We'll see you soon!</p>
++      <div style="font-size:11px;font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:var(--space-sm)" id="cdOkKicker">Delivery Confirmed</div>
++      <div style="font-family:var(--font-heading);font-weight:700;font-size:26px;color:var(--text-primary);line-height:1.15;margin-bottom:4px" id="cdOkDate">August 7, 2026</div>
++      <div style="font-family:var(--font-heading);font-weight:500;font-size:18px;color:var(--text-primary);margin-bottom:var(--space-md)" id="cdOkSlot">10:00 AM – 2:00 PM</div>
++      <div style="font-size:14px;color:var(--text-primary);line-height:1.25;margin-bottom:var(--space-lg)" id="cdOkAddr">245 E 24th St, Apt 4B</div>
++      <p style="font-size:13px;color:var(--text-secondary);line-height:1.25;margin-bottom:var(--space-xl)" id="cdSuccessMsg">We'll remind you 48 hours before.</p>
+       <a class="btn btn-primary" href="#" onclick="closeConfirmDeliveryModal();return false;" style="width:100%;justify-content:center">Done</a>
+     </div>
+   </div>
+@@ -843,7 +1012,7 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+         <div style="font-size:14px;color:var(--text-secondary);margin-bottom:var(--space-md)" id="crSlotDisplay">9:00 AM – 1:00 PM</div>
+         <div class="card-row" style="margin-bottom:0"><span class="card-row-label">Address</span><span class="card-row-value" id="crAddrDisplay">245 E 24th St, Apt 4B</span></div>
+       </div>
+-      <p style="font-size:13px;color:var(--text-secondary);line-height:1.5;margin-bottom:var(--space-lg)">Our team will arrive during this window to disassemble and remove all Roomo furniture from your home.</p>
++      <p style="font-size:13px;color:var(--text-secondary);line-height:1.25;margin-bottom:var(--space-lg)">Our team will arrive during this window to disassemble and remove all Roomo furniture from your home.</p>
+       <div class="modal-actions">
+         <a class="btn btn-ghost" href="#" onclick="crReschedule();return false;">Reschedule</a>
+         <a class="btn btn-primary" href="#" onclick="crConfirm();return false;">Confirm Pickup</a>
+@@ -854,7 +1023,7 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3a5a2a" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+       </div>
+       <div style="font-family:var(--font-heading);font-weight:700;font-size:22px;color:var(--text-primary);margin-bottom:var(--space-sm)">Pickup Confirmed</div>
+-      <p style="font-size:14px;color:var(--text-secondary);line-height:1.5;margin-bottom:var(--space-xl)">Your return pickup is confirmed. We'll take care of everything.</p>
++      <p style="font-size:14px;color:var(--text-secondary);line-height:1.25;margin-bottom:var(--space-xl)">Your return pickup is confirmed. We'll take care of everything.</p>
+       <a class="btn btn-primary" href="#" onclick="closeConfirmReturnModal();return false;" style="width:100%;justify-content:center">Done</a>
+     </div>
+   </div>
+@@ -868,19 +1037,19 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+         <span class="modal-title">Manage End of Term</span>
+         <button class="modal-close" onclick="closeEndOfTermModal()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+       </div>
+-      <p style="font-size:13px;color:var(--text-secondary);line-height:1.5;margin-bottom:var(--space-lg)" id="eotTermEndMsg">Your rental term ends <strong>June 12, 2027</strong>. Choose how you'd like to proceed.</p>
++      <p style="font-size:13px;color:var(--text-secondary);line-height:1.25;margin-bottom:var(--space-lg)" id="eotTermEndMsg">Your rental term ends <strong>June 12, 2027</strong>. Choose how you'd like to proceed.</p>
+       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-md);margin-bottom:var(--space-lg)">
+         <div style="border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-lg);cursor:pointer;transition:border-color 0.2s" onclick="eotSelectRenew(this)" id="eotRenewOption">
+           <div style="font-family:var(--font-heading);font-weight:700;font-size:15px;color:var(--text-primary);margin-bottom:6px">Renew Plan</div>
+-          <div style="font-size:12px;color:var(--text-secondary);line-height:1.4">Keep your furniture and extend your rental for another term.</div>
++          <div style="font-size:12px;color:var(--text-secondary);line-height:1.25">Keep your furniture and extend your rental for another term.</div>
+         </div>
+         <div style="border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-lg);cursor:pointer;transition:border-color 0.2s" onclick="eotSelectBuyout(this)" id="eotBuyoutOption">
+           <div style="font-family:var(--font-heading);font-weight:700;font-size:15px;color:var(--text-primary);margin-bottom:6px">Buy Out</div>
+-          <div style="font-size:12px;color:var(--text-secondary);line-height:1.4">Love it? Keep it forever. Pay the difference to own your furniture.</div>
++          <div style="font-size:12px;color:var(--text-secondary);line-height:1.25">Love it? Keep it forever. Pay the difference to own your furniture.</div>
+         </div>
+         <div style="border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-lg);cursor:pointer;transition:border-color 0.2s" onclick="eotSelectEnd(this)" id="eotEndOption">
+           <div style="font-family:var(--font-heading);font-weight:700;font-size:15px;color:var(--text-primary);margin-bottom:6px">End Plan</div>
+-          <div style="font-size:12px;color:var(--text-secondary);line-height:1.4">Schedule a pickup and return your Roomo furniture.</div>
++          <div style="font-size:12px;color:var(--text-secondary);line-height:1.25">Schedule a pickup and return your Roomo furniture.</div>
+         </div>
+       </div>
+       <div class="modal-actions">
+@@ -904,7 +1073,7 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+         <span class="modal-title">Schedule Return Pickup</span>
+         <button class="modal-close" onclick="closeEndOfTermModal()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+       </div>
+-      <p style="font-size:13px;color:var(--text-secondary);line-height:1.5;margin-bottom:var(--space-lg)">We'll schedule a team to pick up all your Roomo furniture. You can choose the exact date and window in the next step.</p>
++      <p style="font-size:13px;color:var(--text-secondary);line-height:1.25;margin-bottom:var(--space-lg)">We'll schedule a team to pick up all your Roomo furniture. You can choose the exact date and window in the next step.</p>
+       <div class="modal-actions">
+         <a class="btn btn-ghost" href="#" onclick="eotBackToStep1();return false;">Back</a>
+         <a class="btn btn-primary" href="#" onclick="eotGoScheduleReturn();return false;">Pick a Date</a>
+@@ -915,7 +1084,7 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+         <span class="modal-title">Buy Out Your Furniture</span>
+         <button class="modal-close" onclick="closeEndOfTermModal()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+       </div>
+-      <p style="font-size:13px;color:var(--text-secondary);line-height:1.5;margin-bottom:var(--space-lg)">Pay the remaining balance to own your <strong id="buyoutSetName">Living Room Set</strong> permanently. Your payments to date are credited toward the purchase price.</p>
++      <p style="font-size:13px;color:var(--text-secondary);line-height:1.25;margin-bottom:var(--space-lg)">Pay the remaining balance to own your <strong id="buyoutSetName">Living Room Set</strong> permanently. Your payments to date are credited toward the purchase price.</p>
+       <div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:var(--space-lg);margin-bottom:var(--space-lg)">
+         <div style="display:flex;justify-content:space-between;margin-bottom:var(--space-sm)">
+           <span style="font-size:13px;color:var(--text-secondary)">Buy Price</span>
+@@ -949,8 +1118,8 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="1.5"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+         </div>
+         <p style="font-size:14px;color:var(--text-primary);font-weight:600;margin-bottom:var(--space-xs)" id="buyoutConfirmAmount">$1,047.00</p>
+-        <p style="font-size:13px;color:var(--text-secondary);line-height:1.5;margin-bottom:var(--space-md)">will be charged to your <strong id="buyoutConfirmCard">Visa ···· 1234</strong></p>
+-        <p style="font-size:12px;color:var(--text-muted);line-height:1.5;background:var(--bg-secondary);border-radius:var(--radius-md);padding:var(--space-md);margin-bottom:var(--space-lg)">This is a one-time charge. Once confirmed, this purchase cannot be undone. You will own the furniture outright — no further monthly payments or return needed.</p>
++        <p style="font-size:13px;color:var(--text-secondary);line-height:1.25;margin-bottom:var(--space-md)">will be charged to your <strong id="buyoutConfirmCard">Visa ···· 1234</strong></p>
++        <p style="font-size:12px;color:var(--text-muted);line-height:1.25;background:var(--bg-secondary);border-radius:var(--radius-md);padding:var(--space-md);margin-bottom:var(--space-lg)">This is a one-time charge. Once confirmed, this purchase cannot be undone. You will own the furniture outright — no further monthly payments or return needed.</p>
+       </div>
+       <div class="modal-actions">
+         <a class="btn btn-ghost" href="#" onclick="eotBackToBuyoutQuote();return false;">Back</a>
+@@ -962,13 +1131,13 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3a5a2a" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+       </div>
+       <div style="font-family:var(--font-heading);font-weight:700;font-size:22px;color:var(--text-primary);margin-bottom:var(--space-sm)" id="eotStep3Title">Plan Renewed</div>
+-      <p style="font-size:14px;color:var(--text-secondary);line-height:1.6;margin-bottom:var(--space-xl)" id="eotStep3Msg">Your plan has been renewed.</p>
++      <p style="font-size:14px;color:var(--text-secondary);line-height:1.25;margin-bottom:var(--space-xl)" id="eotStep3Msg">Your plan has been renewed.</p>
+       <a class="btn btn-primary" href="#" onclick="closeEndOfTermModal();return false;" style="width:100%;justify-content:center">Done</a>
+     </div>
+     <div id="eotStepFarewell" style="display:none;text-align:center;padding:var(--space-xl) 0">
+       <div style="font-size:40px;margin-bottom:var(--space-md)">🏠</div>
+       <div style="font-family:var(--font-heading);font-weight:700;font-size:22px;color:var(--text-primary);margin-bottom:var(--space-sm)">Thanks for living with Roomo.</div>
+-      <p style="font-size:14px;color:var(--text-secondary);line-height:1.7;margin-bottom:var(--space-xl)">It's been a pleasure furnishing your home. Your return pickup will be in touch shortly — and whenever you're ready to move again, we'll be here.<br><br><span style="color:var(--text-muted);font-size:13px">See you next time. 👋</span></p>
++      <p style="font-size:14px;color:var(--text-secondary);line-height:1.25;margin-bottom:var(--space-xl)">It's been a pleasure furnishing your home. Your return pickup will be in touch shortly — and whenever you're ready to move again, we'll be here.<br><br><span style="color:var(--text-muted);font-size:13px">See you next time. 👋</span></p>
+       <a class="btn btn-primary" href="#" onclick="closeEndOfTermModal();return false;" style="width:100%;justify-content:center">Done</a>
+     </div>
+   </div>
+@@ -997,7 +1166,7 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+           <div class="card-row" style="margin-bottom:0"><span class="card-row-label">Charged to</span><span class="card-row-value" id="makePayCardLabel">Visa ending in 1234</span></div>
+         </div>
+       </div>
+-      <p style="font-size:13px;color:var(--text-secondary);line-height:1.5;margin-bottom:var(--space-lg)" id="makePayBodyText">This covers your July rental payment. Your next payment will be due on August 12, 2026.</p>
++      <p style="font-size:13px;color:var(--text-secondary);line-height:1.25;margin-bottom:var(--space-lg)" id="makePayBodyText">This covers your July rental payment. Your next payment will be due on August 12, 2026.</p>
+       <div class="modal-actions">
+         <a class="btn btn-ghost" href="#" onclick="closeMakePaymentModal();return false;">Cancel</a>
+         <a class="btn btn-primary" href="#" onclick="confirmMakePayment();return false;" id="makePayBtn">Pay $349.00</a>
+@@ -1008,7 +1177,7 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3a5a2a" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+       </div>
+       <div style="font-family:var(--font-heading);font-weight:700;font-size:22px;color:var(--text-primary);margin-bottom:var(--space-sm)">Payment Successful</div>
+-      <p style="font-size:14px;color:var(--text-secondary);line-height:1.5;margin-bottom:4px" id="makePaySuccessAmt">$349.00 has been charged to your card.</p>
++      <p style="font-size:14px;color:var(--text-secondary);line-height:1.25;margin-bottom:4px" id="makePaySuccessAmt">$349.00 has been charged to your card.</p>
+       <p style="font-size:13px;color:var(--text-muted);margin-bottom:var(--space-xl)" id="makePaySuccessNext">Your next payment is due August 12, 2026.</p>
+       <a class="btn btn-primary" href="#" onclick="closeMakePaymentModal();return false;" style="width:100%;justify-content:center">Done</a>
+     </div>
+@@ -1088,7 +1257,7 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a03020" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+         </div>
+         <div style="font-family:var(--font-heading);font-weight:700;font-size:20px;color:var(--text-primary);margin-bottom:var(--space-sm)">Cancel your order?</div>
+-        <p style="font-size:14px;color:#816E68;line-height:1.6;margin-bottom:var(--space-lg)">
++        <p style="font-size:14px;color:#816E68;line-height:1.25;margin-bottom:var(--space-lg)">
+           If your order isn't paid yet, it'll be cancelled right away. If you've already paid the $25 deposit, we'll submit a refund request and our team will review and process it — you'll get an email confirmation.
+         </p>
+       </div>
+@@ -1103,7 +1272,7 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent-olive)" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+         </div>
+         <div id="cancelStep2Title" style="font-family:var(--font-heading);font-weight:700;font-size:22px;color:var(--text-primary);margin-bottom:var(--space-sm)">Request received</div>
+-        <p id="cancelStep2Msg" style="font-size:14px;color:#816E68;margin-bottom:var(--space-lg);line-height:1.6">Our team will review and process your refund. A confirmation email has been sent.</p>
++        <p id="cancelStep2Msg" style="font-size:14px;color:#816E68;margin-bottom:var(--space-lg);line-height:1.25">Our team will review and process your refund. A confirmation email has been sent.</p>
+         <a class="btn btn-primary" href="#" onclick="closeCancelModal();window.location.reload();return false;">Done</a>
+       </div>
+     </div>
+@@ -1113,7 +1282,7 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#a03020" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+         </div>
+         <div style="font-family:var(--font-heading);font-weight:700;font-size:20px;color:var(--text-primary);margin-bottom:var(--space-sm)">Something went wrong</div>
+-        <p style="font-size:14px;color:#816E68;margin-bottom:var(--space-lg);line-height:1.6" id="cancelErrorMsg">Please try again or contact support@roomonyc.com.</p>
++        <p style="font-size:14px;color:#816E68;margin-bottom:var(--space-lg);line-height:1.25" id="cancelErrorMsg">Please try again or contact support@roomonyc.com.</p>
+         <a class="btn btn-primary" href="#" onclick="closeCancelModal();return false;">Close</a>
+       </div>
+     </div>
+@@ -1130,10 +1299,10 @@ a:hover { color: var(--text-primary); text-decoration: underline; }
+         </div>
+         <div style="font-family:var(--font-heading);font-weight:700;font-size:20px;color:var(--text-primary)">End your term early?</div>
+       </div>
+-      <p style="font-size:14px;color:#816E68;margin-bottom:var(--space-md);line-height:1.6">
++      <p style="font-size:14px;color:#816E68;margin-bottom:var(--space-md);line-height:1.25">
+         Early termination is <strong style="color:var(--text-primary)">non-refundable</strong>. Remaining payments through your current term end date will still apply, and your furniture will be picked up on the scheduled return date.
+       </p>
+-      <p style="font-size:13px;color:#816E68;margin-bottom:var(--space-lg);line-height:1.6">
++      <p style="font-size:13px;color:#816E68;margin-bottom:var(--space-lg);line-height:1.25">
+         If you have special circumstances, please contact us at <a href="mailto:hello@roomonyc.com" style="color:var(--text-primary);font-weight:600">hello@roomonyc.com</a> before proceeding — we'll do our best to help.
+       </p>
+       <div class="modal-actions">
+@@ -1302,6 +1471,7 @@ const DEMO_BACKEND = {
+     nextDueMonthLabel: 'July',
+     nextNextDueDateFull: 'August 12, 2026',
+     failedPaymentDate: 'July 12, 2026',
++    failedPaymentDateShort: 'Jul 12, 2026',
+     failedPaymentAmount: 349,
+     autopayEnabled: true,
+     totalPaid: '$4,188.00',
+@@ -1419,6 +1589,7 @@ function mapApiToBackend(api) {
+       nextDueMonthLabel: nextDueMonthLabel,
+       nextNextDueDateFull: nextNextDue,
+       failedPaymentDate: failedPmt ? _fmtDate(failedPmt.date, 'full') : '',
++      failedPaymentDateShort: failedPmt ? _fmtDate(failedPmt.date, 'short') : '',
+       failedPaymentAmount: failedPmt ? failedPmt.amount : 0,
+       autopayEnabled: true,
+       totalPaid: _fmtDollars(totalPaidNum),
+@@ -1609,8 +1780,8 @@ function getConfigLabel() {
+ }
+ function getDraftOverviewHtml() {
+   const m = computeMonthly(demoPlan.setId, demoPlan.months, demoPlan.omit);
+-  const rowStyle = 'line-height:1.7';
+-  return '<div class="cards-grid"><div class="card card-plan-h card-full animate-in">' + draftPlanImageBlock() + '<div class="plan-content"><div class="card-header"><span class="card-title">Draft Plan</span><span class="card-badge badge-error">Action Needed</span></div><div class="card-row" style="' + rowStyle + '"><span class="card-row-label">Set</span><span class="card-row-value" id="draftSetVal">' + setLabel(demoPlan.setId) + '</span></div><div class="card-row" style="' + rowStyle + '"><span class="card-row-label">Color</span><span class="card-row-value" id="draftColorVal">' + colorDisplayName(demoPlan.colorSlug) + '</span></div><div class="card-row" style="' + rowStyle + '"><span class="card-row-label">Configuration</span><span class="card-row-value" id="draftConfigVal">' + getConfigLabel() + '</span></div><div class="card-row" style="' + rowStyle + '"><span class="card-row-label">Term</span><span class="card-row-value" id="draftTerm">' + demoPlan.months + ' months</span></div><div class="card-row" style="' + rowStyle + '"><span class="card-row-label">Monthly</span><span class="card-row-value" id="draftMonthly">$' + m + '</span></div><div class="card-row" style="' + rowStyle + '"><span class="card-row-label">Refundable deposit</span><span class="card-row-value" id="draftDeposit">$25</span></div><p style="font-size:11px;color:var(--text-muted);line-height:1.6;margin:var(--space-sm) 0 var(--space-md)">$25 refundable deposit due at checkout, applied to your first month.</p><div class="card-actions"><a class="btn btn-primary" href="#" onclick="openCheckoutModal();return false;">Complete Checkout</a><a class="btn btn-ghost" href="#" onclick="openEditTermModal();return false;">Edit</a></div><div style="margin-top:8px;text-align:right"><a href="#" onclick="openCancelModal();return false;" style="font-size:12px;color:var(--text-muted);text-decoration:underline">Cancel order</a></div></div></div></div>';
++  const rowStyle = 'line-height:1.25';
++  return '<div class="cards-grid"><div class="card card-plan-h card-full animate-in">' + draftPlanImageBlock() + '<div class="plan-content"><div class="card-header"><span class="card-title">Draft Plan</span><span class="card-badge badge-error">Action Needed</span></div><div class="card-row" style="' + rowStyle + '"><span class="card-row-label">Set</span><span class="card-row-value" id="draftSetVal">' + setLabel(demoPlan.setId) + '</span></div><div class="card-row" style="' + rowStyle + '"><span class="card-row-label">Color</span><span class="card-row-value" id="draftColorVal">' + colorDisplayName(demoPlan.colorSlug) + '</span></div><div class="card-row" style="' + rowStyle + '"><span class="card-row-label">Configuration</span><span class="card-row-value" id="draftConfigVal">' + getConfigLabel() + '</span></div><div class="card-row" style="' + rowStyle + '"><span class="card-row-label">Term</span><span class="card-row-value" id="draftTerm">' + demoPlan.months + ' months</span></div><div class="card-row" style="' + rowStyle + '"><span class="card-row-label">Monthly</span><span class="card-row-value" id="draftMonthly">$' + m + '</span></div><div class="card-row" style="' + rowStyle + '"><span class="card-row-label">Refundable deposit</span><span class="card-row-value" id="draftDeposit">$25</span></div><p style="font-size:11px;color:var(--text-muted);line-height:1.25;margin:var(--space-sm) 0 var(--space-md)">$25 refundable deposit due at checkout, applied to your first month.</p><div class="card-actions"><a class="btn btn-primary" href="#" onclick="openCheckoutModal();return false;">Complete Checkout</a><a class="btn btn-ghost" href="#" onclick="openEditTermModal();return false;">Edit</a></div><div style="margin-top:8px;text-align:right"><a class="link-danger" href="#" onclick="openCancelModal();return false;">Cancel order</a></div></div></div></div>';
+ }
+ function redrawDraftOverview() {
+   if (currentStatus !== 2 || currentTab !== 'overview') return;
+@@ -1620,7 +1791,7 @@ function redrawDraftOverview() {
+ const STATUS = {
+   1: { hero: { label: 'No Active Order', title: 'You have no active order.', subtitle: 'You do not have an active Roomo plan right now. Browse our sets to start one anytime.', cta: 'Browse Roomo Sets', links: ['View Available Room Sets', 'How Roomo Works', 'Contact Support'] } },
+   2: { hero: { label: 'Draft Plan', title: 'Your Roomo plan is waiting.', subtitle: 'Complete your plan to reserve your selected room set and schedule delivery.', cta: 'Complete Checkout', links: ['Review Plan', 'Edit Room Set', 'Contact Support'] } },
+-  3: { hero: { label: 'Confirmed & Scheduled', title: 'Your home is on the way.', hint: '', cta: 'Reschedule' } },
++  3: { hero: { label: 'Confirmed & Scheduled', title: 'Your home is on the way.', hint: '', cta: 'Confirm Details' } },
+   4: { hero: { label: 'Arriving Soon', title: 'Your Roomo delivery is almost here.', hint: '', cta: 'Confirm Delivery' } },
+   5: { hero: { label: 'Active Plan', title: 'Your Roomo home is active.', get hint() { return 'Next bill due ' + BACKEND.billing.nextDueDateFull; }, cta: 'Make Payment', cta2: 'Manage Plan' } },
+   6: { hero: { label: 'Action Required', title: 'Payment action needed.', subtitle: 'We were unable to process your latest Roomo payment. Please update your payment method to keep your plan active.', cta: 'Update Payment Method', links: ['View Payment History', 'Contact Support'] } },
+@@ -1659,8 +1830,9 @@ function getPlanForStatus(s) {
+   return (s <= 2) ? demoPlan : CONFIRMED_PLAN;
+ }
+ function getIncludedItemsList(plan) {
+-  const p = plan || demoPlan;
+-  const { setId, omit } = p;
++  const p = plan || demoPlan || {};
++  const setId = p.setId;
++  const omit = p.omit || {};
+   let items = [];
+   if (setId === 'living') {
+     items = ['Sofa', 'Coffee Table'];
+@@ -1676,6 +1848,122 @@ function getIncludedItemsList(plan) {
+   }
+   return items.join(' · ');
+ }
++/* ─── Pre-delivery checklist ──────────────────────────────────────────────── */
++// Product pages where customers can see full dimensions per set.
++// TODO: confirm the dining and bedroom slugs — only the living page is verified.
++const SET_DETAIL_URL = {
++  living:  'https://www.roomonyc.com/living-detail-page',
++  dining:  'https://www.roomonyc.com/dining-detail-page',
++  bedroom: 'https://www.roomonyc.com/bedding-detail-page'
++};
++// Supports a future multi-set order (BACKEND.plan.sets); falls back to the single setId.
++function _orderedSets() {
++  const p = CONFIRMED_PLAN || {};
++  const list = (BACKEND.plan && Array.isArray(BACKEND.plan.sets) && BACKEND.plan.sets.length)
++    ? BACKEND.plan.sets
++    : [p.setId];
++  return list.filter(function (id) { return SET_DETAIL_URL[id]; });
++}
++// Checklist state is per-browser for now; wire to the order record when the API supports it.
++var PREP_STATE = { elevator: false, fit: false, submitted: false };
++var _prepLoadedFor = null;
++function _prepKey() { return 'roomo_prep_' + (BACKEND.order && BACKEND.order.id ? BACKEND.order.id : 'demo'); }
++// Loaded lazily so the key reflects the real order id once API data has landed.
++function _loadPrep() {
++  const key = _prepKey();
++  if (_prepLoadedFor === key) return;
++  _prepLoadedFor = key;
++  try {
++    const saved = window.localStorage && localStorage.getItem(key);
++    if (saved) PREP_STATE = Object.assign({ elevator: false, fit: false, submitted: false }, JSON.parse(saved));
++  } catch (e) { /* private mode — in-memory only */ }
++}
++function togglePrep(key) {
++  PREP_STATE[key] = !PREP_STATE[key];
++  try { if (window.localStorage) localStorage.setItem(_prepKey(), JSON.stringify(PREP_STATE)); } catch (e) {}
++  renderContent(currentStatus, currentTab);
++}
++// Warm opener that also sets expectations on when money actually moves.
++function welcomeNote(s) {
++  const first = ((BACKEND.user && BACKEND.user.name) || '').trim().split(' ')[0];
++  const hi = first ? 'Welcome home, ' + first + '.' : 'Welcome home.';
++  const copy = s === 4
++    ? "Your furniture is nearly there. The hold for your first month and deposit is already in place, and you're only charged once it's home."
++    : "Your furniture is on its way. We'll hold your first month and deposit 48 hours before delivery, and only charge once it's home.";
++  return `<div class="welcome-note animate-in">
++    <div class="welcome-note-title">
++      <span class="welcome-note-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/><path d="M9.5 21v-6h5v6"/></svg></span>
++      ${hi}
++    </div>
++    <p class="welcome-note-copy">${copy}</p>
++  </div>`;
++}
++function submitPrep() {
++  PREP_STATE.submitted = true;
++  try { if (window.localStorage) localStorage.setItem(_prepKey(), JSON.stringify(PREP_STATE)); } catch (e) {}
++  renderContent(currentStatus, currentTab);
++}
++function prepChecklistCard(s) {
++  _loadPrep();
++  const done = (PREP_STATE.elevator ? 1 : 0) + (PREP_STATE.fit ? 1 : 0);
++  const allDone = done === 2;
++  const sets = _orderedSets();
++  const sizeUrl = SET_DETAIL_URL[sets[0]] || SET_DETAIL_URL.living;
++  const tick = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#F9F5F1" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
++
++  if (PREP_STATE.submitted) {
++    return `<div class="card card-full animate-in">
++      <div class="card-header">
++        <span class="card-title">Before your delivery</span>
++        <span class="card-badge badge-confirmed">Confirmed</span>
++      </div>
++      <p class="prep-copy">Thanks, you're all set. We'll see you on delivery day.</p>
++      <div class="card-actions"><a class="btn btn-ghost" href="#" onclick="togglePrep('submitted');return false;">Review Again</a></div>
++    </div>`;
++  }
++
++  return `<div class="card card-full animate-in">
++    <div class="card-header">
++      <span class="card-title">Before your delivery</span>
++      <span class="prep-progress">${done} of 2 done</span>
++    </div>
++    <div class="prep-item ${PREP_STATE.elevator ? 'is-done' : ''}">
++      <button class="prep-check" onclick="togglePrep('elevator')" aria-pressed="${PREP_STATE.elevator}" aria-label="Mark elevator booking as done">${tick}</button>
++      <div class="prep-body">
++        <div class="prep-title">Book your building's elevator</div>
++        <div class="prep-copy">Reserve it for your delivery window if your building requires one.</div>
++      </div>
++    </div>
++
++    <div class="prep-item ${PREP_STATE.fit ? 'is-done' : ''}">
++      <button class="prep-check" onclick="togglePrep('fit')" aria-pressed="${PREP_STATE.fit}" aria-label="Confirm everything fits">${tick}</button>
++      <div class="prep-body">
++        <div class="prep-title">Check everything fits</div>
++        <div class="prep-copy">Look up the sizes, then measure your doorways, hallways, and where each piece is going.</div>
++        <a class="prep-link" href="${sizeUrl}" target="_blank" rel="noopener noreferrer">You can see details on our website</a>
++      </div>
++    </div>
++
++    <div class="card-actions">
++      <a class="btn btn-primary" href="#" onclick="${allDone ? 'submitPrep()' : 'return false'};return false;" ${allDone ? '' : 'style="opacity:0.4"'}>Submit</a>
++    </div>
++  </div>`;
++}
++// Full explanation of the pre-delivery hold; the checklist card carries a short version.
++function depositHoldCard() {
++  const monthly = BACKEND.billing.monthlyAmount || 0;
++  const firstMonth = Math.max(monthly - 25, 0);
++  const _dd = window._deliveryDate || {};
++  const when = _dd.dateMain ? ' (around ' + _dd.dateMain + ')' : '';
++  return `<div class="card animate-in">
++    <div class="card-header"><span class="card-title">Before delivery</span><span class="card-badge badge-scheduled">Hold, not a charge</span></div>
++    <p class="card-body">About 48 hours before your delivery window${when}, we'll place a temporary hold on your card. Nothing is charged yet, it just reserves the amount.</p>
++    <div class="card-row"><span class="card-row-label">First month</span><span class="card-row-value">$${firstMonth.toFixed(2)}<span style="color:var(--text-muted)"> · $25 deposit already applied</span></span></div>
++    <div class="card-row"><span class="card-row-label">Furniture deposit</span><span class="card-row-value">$${monthly.toFixed(2)}<span style="color:var(--text-muted)"> · refundable</span></span></div>
++    <p class="prep-footnote">The actual charge happens once your furniture is delivered and you've confirmed it arrived. If your delivery is cancelled or doesn't go ahead, the hold is simply released. Your furniture deposit comes back to you at the end of your term, or goes toward your buyout if you decide to keep everything.</p>
++    <div class="card-actions"><a class="btn btn-ghost" href="#" onclick="openPaymentModal();return false;">Update Payment Method</a></div>
++  </div>`;
++}
+ function planDetailCard(s, bc, bt) {
+   const _plan = getPlanForStatus(s);
+   const opts = s>=5&&s<=7
+@@ -1705,7 +1993,7 @@ function planDetailCard(s, bc, bt) {
+       </div>
+       <div style="margin-bottom:var(--space-md)">
+         <div style="font-size:11px;font-weight:500;color:var(--text-muted);text-transform:uppercase;margin-bottom:8px">What's Included</div>
+-        <div style="font-size:13px;color:var(--text-primary);line-height:1.6;font-weight:400">${getIncludedItemsList(_plan)}<br><span style="color:var(--text-muted)">Delivery, assembly, furniture care support, end-of-term pickup</span></div>
++        <div style="font-size:13px;color:var(--text-primary);line-height:1.25;font-weight:400">${getIncludedItemsList(_plan)}<br><span style="color:var(--text-muted)">Delivery, assembly, furniture care support, end-of-term pickup</span></div>
+       </div>
+       <div class="card-actions">${opts}</div>
+     </div>
+@@ -1727,19 +2015,19 @@ function paymentCard(f, full=false) {
+   return `<div class="${cls}"><div class="card-header"><span class="card-title">Payment</span></div><div style="display:flex;align-items:flex-end;justify-content:space-between;padding:var(--space-md) 0 var(--space-sm);border-bottom:1px solid var(--border-light);margin-bottom:var(--space-md)"><div><div style="font-size:11px;font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Amount Due</div><div style="font-family:var(--font-body);font-weight:700;font-size:32px;color:var(--text-primary);line-height:1;letter-spacing:-1px">${_monthlyAmt}</div></div><div style="text-align:right;padding-bottom:4px"><div style="font-size:11px;font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Due Date</div><div style="font-family:var(--font-body);font-weight:700;font-size:20px;color:var(--text-primary);line-height:1">${BACKEND.billing.nextDueDateFull}</div></div></div><div class="card-row"><span class="card-row-label">Method</span><span class="card-row-value">${_pm2.brand} ending in ${_pm2.last4}</span></div><div class="card-actions"><a class="btn btn-primary" href="#" onclick="openMakePaymentModal();return false;">Make Payment</a><a class="btn btn-ghost" href="#" onclick="openPaymentModal();return false;">Update Payment Method</a></div></div>`;
+ }
+ function deliveryCard(s, full=false, details=false) {
+-  var _cancelLink = (s===2||s===3||s===4) ? '<div style="margin-top:8px;text-align:right"><a href="#" onclick="openCancelModal();return false;" style="font-size:12px;color:var(--text-muted);text-decoration:underline">Cancel order</a></div>' : '';
++  var _cancelLink = (s===2||s===3||s===4) ? '<div style="margin-top:8px;text-align:right"><a class="link-danger" href="#" onclick="openCancelModal();return false;">Cancel order</a></div>' : '';
+   if(s===3||s===4) {
+     if(!details) {
+       const _dd2=window._deliveryDate||{};
+       const _dm2=(_dd2.dateMain||'June 12')+', '+(_dd2.year||'2026');
+       const _ds2=_dd2.slot||'10:00 AM – 2:00 PM';
+-      return `<div class="card ${full?'card-full':''} animate-in"><div class="card-header"><span class="card-title">Delivery Appointment</span><span class="card-badge badge-scheduled">${s===4?'Arriving Soon':'Scheduled'}</span></div><div style="padding-top:var(--space-sm)"><div style="font-family:var(--font-body);font-weight:700;font-size:26px;color:var(--text-primary);line-height:1.15;margin-bottom:6px">${_dm2}</div><div style="font-size:14px;color:var(--text-secondary);margin-bottom:var(--space-md)">${_ds2}</div><div class="card-row"><span class="card-row-label">Address</span><span class="card-row-value">${_addrLine1()}</span></div><div class="card-actions"><a class="btn btn-primary" href="#" onclick="openReschedule();return false;">Reschedule</a><a class="btn btn-ghost" href="#" onclick="openAddressModal();return false;">Change Address</a></div>${_cancelLink}</div></div>`;
++      return `<div class="card ${full?'card-full':''} animate-in"><div class="card-header"><span class="card-title">Delivery Appointment</span><span class="card-badge badge-scheduled">${s===4?'Arriving Soon':'Scheduled'}</span></div><div style="padding-top:var(--space-sm)"><div style="font-family:var(--font-body);font-weight:700;font-size:26px;color:var(--text-primary);line-height:1.15;margin-bottom:6px">${_dm2}</div><div style="font-size:14px;color:var(--text-secondary);margin-bottom:var(--space-md)">${_ds2}</div><div class="card-row"><span class="card-row-label">Address</span><span class="card-row-value">${_addrLine1()}</span></div><div class="card-actions"><a class="btn btn-primary" href="#" onclick="openConfirmDeliveryModal();return false;">${s===4?'Confirm Delivery':'Confirm Details'}</a><a class="btn btn-ghost" href="#" onclick="openReschedule();return false;">Reschedule</a></div>${_cancelLink}</div></div>`;
+     }
+     const _dd=window._deliveryDate||{};
+     const _dMain=_dd.dateMain||'June 12';
+     const _dYear=_dd.year||'2026';
+     const _dSlot=_dd.slot||'10:00 AM – 2:00 PM';
+-    return `<div class="card card-delivery ${full?'card-full':''} animate-in"><div class="card-header"><span class="card-title">Delivery Appointment</span><span class="card-badge badge-scheduled">${s===4?'Arriving Soon':'Scheduled'}</span></div><div class="delivery-split"><div class="delivery-date-block"><div class="delivery-date-main">${_dMain}<br>${_dYear}</div><div class="delivery-time-main">${_dSlot}</div></div><div class="delivery-meta"><div class="card-row"><span class="card-row-label">Address</span><span class="card-row-value">${_addrLine1()}</span></div><div class="card-row"><span class="card-row-label">Access</span><span class="card-row-value">${_addrAccess()}</span></div><div class="card-actions"><a class="btn btn-primary" href="#" onclick="openReschedule();return false;">Reschedule</a><a class="btn btn-ghost" href="#" onclick="openAddressModal();return false;">Change Address</a></div>${_cancelLink}</div></div></div>`;
++    return `<div class="card card-delivery ${full?'card-full':''} animate-in"><div class="card-header"><span class="card-title">Delivery Appointment</span><span class="card-badge badge-scheduled">${s===4?'Arriving Soon':'Scheduled'}</span></div><div class="delivery-split"><div class="delivery-date-block"><div class="delivery-date-main">${_dMain}<br>${_dYear}</div><div class="delivery-time-main">${_dSlot}</div></div><div class="delivery-meta"><div class="card-row"><span class="card-row-label">Address</span><span class="card-row-value">${_addrLine1()}</span></div><div class="card-row"><span class="card-row-label">Access</span><span class="card-row-value">${_addrAccess()}</span></div><div class="card-actions"><a class="btn btn-primary" href="#" onclick="openConfirmDeliveryModal();return false;">${s===4?'Confirm Delivery':'Confirm Details'}</a><a class="btn btn-ghost" href="#" onclick="openReschedule();return false;">Reschedule</a><a class="btn btn-ghost" href="#" onclick="openAddressModal();return false;">Change Address</a></div>${_cancelLink}</div></div></div>`;
+   }
+   return '';
+ }
+@@ -1771,8 +2059,8 @@ function getOverviewContent(s) {
+   switch(s) {
+     case 1: return `<div class="empty-state"><div class="empty-state-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><div class="empty-state-title">No active plan yet.</div><div class="empty-state-body">You do not have an active Roomo plan at the moment. Once you choose a room set and confirm your order, your plan, delivery, billing, and support details will appear here.</div><a class="btn btn-primary" href="https://www.roomonyc.com/living-detail-page" target="_blank">Browse Roomo Sets</a></div><div class="steps"><div class="step"><div class="step-number">1</div><div class="step-title">Choose your set</div><div class="step-desc">Living, Dining, or Bedroom</div></div><div class="step"><div class="step-number">2</div><div class="step-title">Schedule delivery</div><div class="step-desc">Pick a date that works</div></div><div class="step"><div class="step-number">3</div><div class="step-title">Move in</div><div class="step-desc">We set everything up</div></div><div class="step"><div class="step-number">4</div><div class="step-title">Live, then decide</div><div class="step-desc">Renew, swap, or return</div></div></div>`;
+     case 2: return getDraftOverviewHtml();
+-    case 3: return `<div class="cards-grid">${deliveryCard(3,true)}${planCard(3,'badge-confirmed','Confirmed',true)}</div>`;
+-    case 4: return `<div class="cards-grid">${deliveryCard(4,true)}${planCard(4,'badge-confirmed','Confirmed',true)}</div>`;
++    case 3: return `<div class="cards-grid">${welcomeNote(3)}${prepChecklistCard(3)}${deliveryCard(3,true)}${planCard(3,'badge-confirmed','Confirmed',true)}</div>`;
++    case 4: return `<div class="cards-grid">${welcomeNote(4)}${prepChecklistCard(4)}${deliveryCard(4,true)}${planCard(4,'badge-confirmed','Confirmed',true)}</div>`;
+     case 5: return `<div class="cards-grid">${planCard(5,'badge-active','Active',true)}${paymentCard(false,true)}</div>`;
+     case 6: return `<div class="cards-grid">${paymentCard(true,true)}${planCard(6,'badge-active','Active',true)}</div>`;
+     case 7: return `<div class="cards-grid">${endOfTermCard()}${planCard(7,'badge-pending','Ending Soon',true)}</div>`;
+@@ -1804,10 +2092,13 @@ function renderHero(s) {
+   if(s===7 && window._extendedTerm && window._extendedTerm.endDate) {
+     hint = 'Term ends ' + window._extendedTerm.endDate;
+   }
++  // Photo background with a status-tinted wash on top, rather than a flat gradient.
+   const bg = document.querySelector('.hero-bg');
+-  if(s===6) bg.style.backgroundImage='linear-gradient(135deg,#8b5a4a 0%,#6b3a2a 40%,#4a2a1a 100%)';
+-  else if(s===4) bg.style.backgroundImage='linear-gradient(135deg,#7a8b6a 0%,#5a6b4a 40%,#3a4a2a 100%)';
+-  else bg.style.backgroundImage='linear-gradient(135deg,#c4a882 0%,#8b7355 30%,#6b5b4a 60%,#4a3f35 100%)';
++  const photo = window.innerWidth <= 768 ? "url('/images/hero-draped-bed.jpg')" : "url('/images/hero-draped-bed-wide.jpg')";
++  const wash = s===6 ? 'linear-gradient(180deg,rgba(107,58,42,0.55) 0%,rgba(74,42,26,0.75) 100%)'
++             : s===4 ? 'linear-gradient(180deg,rgba(74,90,58,0.45) 0%,rgba(58,74,42,0.7) 100%)'
++             : '';
++  bg.style.backgroundImage = wash ? wash + ', ' + photo : photo;
+   // Build CTAs
+   let ctaHtml = '';
+   if(s===5) {
+@@ -1817,9 +2108,10 @@ function renderHero(s) {
+       + `</div>`
+       + `<div style="margin-top:12px"><a href="#" onclick="openEndTermEarlyModal();return false;" style="font-size:12px;color:rgba(249,245,241,0.45);text-decoration:underline;font-family:var(--font-body)">End term early</a></div>`;
+   } else if(s===3) {
+-    ctaHtml = `<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><a class="hero-cta" href="#" onclick="openReschedule();return false;">${d.cta}</a><a class="hero-cta" href="#" style="background:transparent;border:1px solid rgba(249,245,241,0.5);color:rgba(249,245,241,0.85)" onclick="openAddressModal();return false;">Change Address</a></div><div style="margin-top:12px"><a href="#" onclick="openCancelModal();return false;" style="font-size:12px;color:rgba(249,245,241,0.45);text-decoration:underline;font-family:var(--font-body)">Cancel order</a></div>`;
++    // Confirming the appointment is the job to be done; rescheduling lives inside it.
++    ctaHtml = `<a class="hero-cta" href="#" onclick="openConfirmDeliveryModal();return false;">${d.cta}</a><div style="margin-top:12px"><a class="link-danger-hero" href="#" onclick="openCancelModal();return false;">Cancel order</a></div>`;
+   } else if(s===4) {
+-    ctaHtml = `<a class="hero-cta" href="#" onclick="openConfirmDeliveryModal();return false;">${d.cta}</a><div style="margin-top:12px"><a href="#" onclick="openCancelModal();return false;" style="font-size:12px;color:rgba(249,245,241,0.45);text-decoration:underline;font-family:var(--font-body)">Cancel order</a></div>`;
++    ctaHtml = `<a class="hero-cta" href="#" onclick="openConfirmDeliveryModal();return false;">${d.cta}</a><div style="margin-top:12px"><a class="link-danger-hero" href="#" onclick="openCancelModal();return false;">Cancel order</a></div>`;
+   } else if(s===6) {
+     ctaHtml = `<a class="hero-cta" href="#" onclick="openPaymentModal();return false;">${d.cta}</a>`;
+   } else if(s===7) {
+@@ -1827,7 +2119,7 @@ function renderHero(s) {
+   } else if(s===8) {
+     ctaHtml = `<a class="hero-cta" href="#" onclick="openConfirmReturnModal();return false;">${d.cta}</a>`;
+   } else if(s===2) {
+-    ctaHtml = `<a class="hero-cta" href="#" onclick="openCheckoutModal();return false;">${d.cta}</a><div style="margin-top:12px"><a href="#" onclick="openCancelModal();return false;" style="font-size:12px;color:rgba(249,245,241,0.45);text-decoration:underline;font-family:var(--font-body)">Cancel order</a></div>`;
++    ctaHtml = `<a class="hero-cta" href="#" onclick="openCheckoutModal();return false;">${d.cta}</a><div style="margin-top:12px"><a class="link-danger-hero" href="#" onclick="openCancelModal();return false;">Cancel order</a></div>`;
+   } else if(s===1) {
+     ctaHtml = `<a class="hero-cta" href="https://www.roomonyc.com/living-detail-page">${d.cta}</a>`;
+   } else if(s===9 || s===10) {
+@@ -1837,8 +2129,70 @@ function renderHero(s) {
+   }
+   document.getElementById('heroContent').innerHTML =
+     `<div class="hero-label">${d.label}</div><h1 class="hero-title">${d.title}</h1>${hint ? `<p class="hero-hint">${hint}</p>` : ''}` + ctaHtml;
++  renderMinibar(s, d, hint);
++}
++
++/* ─── Compact status bar (mobile) ───────────────────────────────────────────
++   Mirrors the hero's most urgent action so collapsing the full-screen hero
++   never hides what the customer needs to act on. */
++const MINIBAR = {
++  1:  { cta: 'Browse Sets',   href: 'https://www.roomonyc.com/living-detail-page', dot: '#9eb1bb' },
++  2:  { cta: 'Checkout',      fn: 'openCheckoutModal',       dot: '#c98b4b' },
++  3:  { cta: 'Confirm',      fn: 'openConfirmDeliveryModal', dot: '#9eb1bb' },
++  4:  { cta: 'Confirm',       fn: 'openConfirmDeliveryModal',dot: '#7a9a5a', bg: '#3f4a33' },
++  5:  { cta: 'Pay Now',       fn: 'openMakePaymentModal',    dot: '#7a9a5a' },
++  6:  { cta: 'Update Card',   fn: 'openPaymentModal',        dot: '#d4674b', bg: '#5a3226' },
++  7:  { cta: 'Manage',        fn: 'openEndOfTermModal',      dot: '#c98b4b' },
++  8:  { cta: 'Manage',        fn: 'openConfirmReturnModal',  dot: '#9eb1bb' },
++  9:  { cta: 'New Plan',      href: 'https://www.roomonyc.com/living-detail-page', dot: '#a89595' },
++  10: { cta: 'New Plan',      href: 'https://www.roomonyc.com/living-detail-page', dot: '#a89595' }
++};
++function renderMinibar(s, d, hint) {
++  const bar = document.getElementById('heroMinibar');
++  if (!bar) return;
++  const cfg = MINIBAR[s] || {};
++  bar.style.setProperty('--minibar-bg', cfg.bg || '#4a3f35');
++  bar.style.setProperty('--minibar-dot', cfg.dot || '#9eb1bb');
++  document.getElementById('heroMinibarLabel').textContent = d.label || '';
++  // Prefer the concrete date/time hint; fall back to the headline so the bar is never empty.
++  document.getElementById('heroMinibarHint').textContent = hint || d.title || '';
++  const cta = document.getElementById('heroMinibarCta');
++  cta.textContent = cfg.cta || d.cta || '';
++  if (cfg.href) {
++    cta.href = cfg.href; cta.target = '_blank'; cta.rel = 'noopener noreferrer'; cta.onclick = null;
++  } else {
++    cta.href = '#'; cta.removeAttribute('target'); cta.removeAttribute('rel');
++    cta.onclick = function (e) { e.preventDefault(); if (typeof window[cfg.fn] === 'function') window[cfg.fn](); };
++  }
++}
++// Re-open the full-screen hero from the compact bar.
++var _heroGrace = 0;
++function expandHero() {
++  const hero = document.getElementById('heroBanner');
++  if (!hero) return;
++  hero.classList.remove('is-collapsed');
++  hero.removeAttribute('aria-hidden');
++  if ('inert' in hero) hero.inert = false;
++  if (window._setMinibarVisible) window._setMinibarVisible(false);
++  // Momentum from the flick that got you here can still be arriving; without this the
++  // scroll watcher would fold the hero straight back up.
++  _heroGrace = Date.now() + 900;
++  // Hold the top for the whole unfold, otherwise snapping pulls us down onto a card and
++  // only the bottom sliver of the hero stays visible.
++  if (typeof _holdTop === 'function') _holdTop(700); else window.scrollTo(0, 0);
+ }
+ function renderContent(s, tab) {
++  try { _renderContent(s, tab); }
++  catch (err) {
++    // Never leave the customer staring at a blank page if one card fails to build.
++    console.error('renderContent failed', err);
++    document.getElementById('contentArea').innerHTML =
++      `<div class="empty-state"><div class="empty-state-title">Something went wrong loading this page.</div>` +
++      `<div class="empty-state-body">Please refresh. If it keeps happening, contact us and we'll sort it out.</div>` +
++      `<a class="btn btn-primary" href="#" onclick="location.reload();return false;">Refresh</a></div>`;
++  }
++}
++function _renderContent(s, tab) {
+   const area = document.getElementById('contentArea');
+   if(tab==='overview') { area.innerHTML = getOverviewContent(s); }
+   else if(tab==='plan') {
+@@ -1850,6 +2204,7 @@ function renderContent(s, tab) {
+     else if(s>=5&&s<=7) area.innerHTML=`<div class="cards-grid">${window._returnPickup ? returnPickupCard(window._returnPickup) : ''}<div class="card card-delivery card-full animate-in"><div class="card-header"><span class="card-title">Delivery Completed</span><span class="card-badge badge-confirmed" style="color:#3a5a2a">Completed</span></div><div class="delivery-split"><div class="delivery-date-block"><div class="delivery-date-main">${BACKEND.delivery.completedDateMain}<br>${BACKEND.delivery.completedYear}</div></div><div class="delivery-meta"><div class="card-row"><span class="card-row-label">Address</span><span class="card-row-value">${_addrLine1()}, ${_addrLine2().split(",")[0]}</span></div><div style="font-size:13px;color:var(--text-secondary);margin-top:var(--space-sm)">Your Roomo furniture has been delivered and set up.</div></div></div></div></div>`;
+     else if(s===8) area.innerHTML=`<div class="cards-grid">${returnCard()}</div>`;
+     else if(s===9) area.innerHTML=`<div class="empty-state"><div class="empty-state-title">No active delivery.</div><div class="empty-state-body">Your past deliveries are complete.</div></div>`;
++    else if(s===10) area.innerHTML=`<div class="empty-state"><div class="empty-state-title">No delivery scheduled.</div><div class="empty-state-body">This order was cancelled, so there is nothing on the calendar. You can start a new plan anytime.</div><a class="btn btn-primary" href="https://www.roomonyc.com/living-detail-page" target="_blank">Browse Roomo Sets</a></div>`;
+     else area.innerHTML=`<div class="cards-grid">${deliveryCard(s,true,true)}</div>`;
+   } else if(tab==='billing') {
+     if(s<=2) area.innerHTML=`<div class="empty-state"><div class="empty-state-title">${s===1?'No billing details yet.':'Billing not completed.'}</div><div class="empty-state-body">${s===1?'Billing details will appear here after you place a Roomo order.':'Complete checkout to confirm your payment method and Roomo plan.'}</div>${s===2?'<a class="btn btn-primary" href="#">Complete Checkout</a>':''}</div>`;
+@@ -1857,14 +2212,14 @@ function renderContent(s, tab) {
+       const _histRows = BACKEND.billing.paymentHistory.map(r =>
+         `<tr><td>${r.date}</td><td>${r.amount}</td><td><span class="card-badge ${r.status==='paid'?'badge-active':'badge-error'}">${r.status==='paid'?'Paid':'Failed'}</span></td><td><a href="#" style="font-size:12px">${r.status==='paid'?'Receipt':'Retry'}</a></td></tr>`
+       ).join('');
+-      const _failedRow = s===6 ? `<tr><td>${BACKEND.billing.failedPaymentDate}</td><td>$${BACKEND.billing.failedPaymentAmount.toFixed(2)}</td><td><span class="card-badge badge-error">Failed</span></td><td><a href="#" onclick="openTryAgainModal();return false;" style="font-size:12px">Retry</a></td></tr>` : '';
+-      area.innerHTML=`<div class="cards-grid">${s===6?paymentCard(true):paymentCard(false)}${autopayCard(BACKEND.billing.autopayEnabled)}<div class="card card-full animate-in"><div class="card-header"><span class="card-title">Recent Payments</span></div><div class="table-wrap"><table class="table-minimal"><thead><tr><th>Date</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>${_failedRow}${_histRows}</tbody></table></div></div></div>`;
++      const _failedRow = s===6 ? `<tr><td>${BACKEND.billing.failedPaymentDateShort || BACKEND.billing.failedPaymentDate}</td><td>$${BACKEND.billing.failedPaymentAmount.toFixed(2)}</td><td><span class="card-badge badge-error">Failed</span></td><td><a href="#" onclick="openTryAgainModal();return false;" style="font-size:12px">Retry</a></td></tr>` : '';
++      area.innerHTML=`<div class="cards-grid">${s===6?paymentCard(true):paymentCard(false)}${(s===3||s===4)?depositHoldCard():''}${autopayCard(BACKEND.billing.autopayEnabled)}<div class="card card-full animate-in"><div class="card-header"><span class="card-title">Recent Payments</span></div><div class="table-wrap"><table class="table-minimal"><thead><tr><th>Date</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>${_failedRow}${_histRows}</tbody></table></div></div></div>`;
+     }
+   } else if(tab==='history') {
+     if(s<=2) area.innerHTML=`<div class="empty-state"><div class="empty-state-title">No order history yet.</div><div class="empty-state-body">Your past Roomo rental plans and product orders will appear here after you place an order.</div><a class="btn btn-primary" href="https://www.roomonyc.com/living-detail-page" target="_blank">Browse Roomo Sets</a></div>`;
+     else area.innerHTML=`<div class="cards-grid"><div class="card card-plan-h card-full animate-in">${planImageBlock(s)}<div class="plan-content"><div class="card-header"><span class="card-title">${setLabel(CONFIRMED_PLAN.setId)} Set</span><span class="card-badge ${s===9?'badge-completed':'badge-active'}">${s===9?'Completed':'Active'}</span></div><div style="margin-bottom:var(--space-md)"><div style="font-family:var(--font-heading);font-weight:700;font-size:17px;color:var(--text-primary);margin-bottom:8px">${setLabel(CONFIRMED_PLAN.setId)} Set</div><div style="font-size:13px;color:#816E68">${colorDisplayName(CONFIRMED_PLAN.colorSlug)} · ${CONFIRMED_PLAN.months}-month rental</div></div><div style="border-top:1px solid var(--border-light);padding-top:var(--space-md)"><div class="card-row"><span class="card-row-label">Lease Start</span><span class="card-row-value">${BACKEND.lease.startDateFull}</span></div><div class="card-row"><span class="card-row-label">Lease End</span><span class="card-row-value">${BACKEND.lease.endDateFull}</span></div><div class="card-row"><span class="card-row-label">Monthly</span><span class="card-row-value">$${planMonthly(CONFIRMED_PLAN)} / month</span></div>${s===9?`<div class="card-row"><span class="card-row-label">Total Paid</span><span class="card-row-value">${BACKEND.billing.totalPaid}</span></div>`:''}</div><div style="border-top:1px solid var(--border-light);padding-top:var(--space-md);margin-top:var(--space-md)"><div class="card-row"><span class="card-row-label">Items</span><span class="card-row-value">${getIncludedItemsList(CONFIRMED_PLAN)}</span></div></div><div class="card-actions"><a class="btn btn-ghost" href="#" onclick="downloadReceipts();return false;">Download Receipts</a></div></div></div></div>`;
+   } else if(tab==='support') {
+-    area.innerHTML=`<div style="text-align:center;max-width:520px;margin:0 auto;padding-top:var(--space-lg)"><h2 style="font-family:var(--font-heading);font-weight:700;font-size:24px;margin-bottom:var(--space-lg)">How can we help?</h2><p style="font-size:14px;color:#816E68;line-height:1.5;font-weight:400;margin-bottom:var(--space-lg)">Contact Roomo for delivery changes, billing questions, furniture care, swaps, returns, or general support.</p><a class="btn btn-primary" href="https://www.roomonyc.com/support" target="_blank">Contact Support</a><p style="font-size:12px;color:#816E68;margin-top:var(--space-sm);font-weight:400">hello@roomonyc.com</p></div>`;
++    area.innerHTML=`<div style="text-align:center;max-width:520px;margin:0 auto;padding-top:var(--space-lg)"><h2 style="font-family:var(--font-heading);font-weight:700;font-size:24px;margin-bottom:var(--space-lg)">How can we help?</h2><p style="font-size:14px;color:#816E68;line-height:1.25;font-weight:400;margin-bottom:var(--space-lg)">Contact Roomo for delivery changes, billing questions, furniture care, swaps, returns, or general support.</p><a class="btn btn-primary" href="https://www.roomonyc.com/support" target="_blank">Contact Support</a><p style="font-size:12px;color:#816E68;margin-top:var(--space-sm);font-weight:400">hello@roomonyc.com</p></div>`;
+   } else if(tab==='account') {
+     const _email = (BACKEND.user && BACKEND.user.email) || '';
+     area.innerHTML = `<div class="cards-grid">
+@@ -1879,7 +2234,7 @@ function renderContent(s, tab) {
+       <div class="card card-full animate-in">
+         <div class="card-header"><span class="card-title">Session</span></div>
+         <div style="padding:8px 2px">
+-          <p style="font-size:13px;color:var(--text-secondary);line-height:1.6;margin:0 0 14px">Signed in as ${_email || 'your account'}.</p>
++          <p style="font-size:13px;color:var(--text-secondary);line-height:1.25;margin:0 0 14px">Signed in as ${_email || 'your account'}.</p>
+           <a class="btn btn-ghost" href="#" onclick="acctLogout();return false;" style="width:auto;border-color:#a03020;color:#a03020">Log out</a>
+         </div>
+       </div>
+@@ -1926,7 +2281,7 @@ async function acctLoadMethods() {
+ 
+   if (email && google) {
+     // Both methods
+-    html = '<p style="font-size:13px;color:var(--text-secondary);line-height:1.6;margin:0 0 12px">You have <b>two ways to sign in</b> — email &amp; password, and Google. You can use either one, and manage them here.</p>'
++    html = '<p style="font-size:13px;color:var(--text-secondary);line-height:1.25;margin:0 0 12px">You have <b>two ways to sign in</b> — email &amp; password, and Google. You can use either one, and manage them here.</p>'
+       + '<div class="card-row"><span class="card-row-label">Email &amp; password</span><span class="card-row-value">Connected</span></div>'
+       + '<div class="card-row"><span class="card-row-label">Google</span><span class="card-row-value">' + (gEmail || 'Connected') + '</span></div>'
+       + '<div style="height:18px"></div>' + _acctPassBlock('Change password')
+@@ -1934,14 +2289,14 @@ async function acctLoadMethods() {
+       + '<a class="btn btn-ghost" href="#" onclick="acctUnlinkGoogle();return false;" style="width:auto">Disconnect Google</a>';
+   } else if (google && !email) {
+     // Google only — offer a backup password
+-    html = '<p style="font-size:13px;color:var(--text-secondary);line-height:1.6;margin:0 0 14px">You sign in with <b>Google</b>' + (gEmail ? (' (' + gEmail + ')') : '') + '. Add a password as a backup way to sign in.</p>'
++    html = '<p style="font-size:13px;color:var(--text-secondary);line-height:1.25;margin:0 0 14px">You sign in with <b>Google</b>' + (gEmail ? (' (' + gEmail + ')') : '') + '. Add a password as a backup way to sign in.</p>'
+       + _acctPassBlock('Add a backup password');
+   } else {
+     // Email / password only — offer to link Google
+-    html = '<p style="font-size:13px;color:var(--text-secondary);line-height:1.6;margin:0 0 14px">You sign in with <b>email &amp; password</b>.</p>'
++    html = '<p style="font-size:13px;color:var(--text-secondary);line-height:1.25;margin:0 0 14px">You sign in with <b>email &amp; password</b>.</p>'
+       + _acctPassBlock('Change password')
+       + '<div style="height:18px"></div>'
+-      + '<p style="font-size:12px;color:#816E68;margin:0 0 10px;line-height:1.5">Link Google for one-click sign in.</p>'
++      + '<p style="font-size:12px;color:#816E68;margin:0 0 10px;line-height:1.25">Link Google for one-click sign in.</p>'
+       + '<a class="btn btn-ghost" href="#" onclick="acctLinkGoogle();return false;" style="width:auto">Link Google account</a>';
+   }
+   box.innerHTML = html;
+@@ -2012,7 +2367,7 @@ function showNoOrder(email) {
+   cover.innerHTML = '<div style="max-width:420px">'
+     + '<div style="font-family:\'MuseoModerno\',cursive;font-size:26px;color:#49372A;margin-bottom:18px">ROOMO</div>'
+     + '<div style="font-size:18px;font-weight:700;color:#49372A;margin-bottom:8px">No order found</div>'
+-    + '<p style="font-size:14px;color:#8B7355;line-height:1.6;margin:0 0 20px">We couldn\'t find an order under '
++    + '<p style="font-size:14px;color:#8B7355;line-height:1.25;margin:0 0 20px">We couldn\'t find an order under '
+     + (email ? '<b>' + email + '</b>' : 'this account')
+     + '.<br>If you ordered with a different email, log out and sign in with that one.</p>'
+     + '<a href="https://www.roomonyc.com/living-detail-page" style="display:inline-block;background:#49372A;color:#F9F5F1;text-decoration:none;padding:12px 24px;border-radius:999px;font-size:14px;font-weight:700;margin-bottom:12px">Browse sets</a><br>'
+@@ -2776,6 +3131,12 @@ function openConfirmDeliveryModal() {
+   document.getElementById('cdDateDisplay').textContent = dateStr;
+   document.getElementById('cdSlotDisplay').textContent = _dd.slot || '10:00 AM – 2:00 PM';
+   document.getElementById('cdAddrDisplay').textContent = _addrLine1();
++  // State 3 is "check these details are right"; state 4 is "we're arriving imminently".
++  const early = currentStatus === 3;
++  document.getElementById('cdCopy').textContent = early
++    ? 'Check that the date, time window, and address below are right. If anything needs changing, do it now — we can still adjust before the truck is loaded.'
++    : "Your delivery team will arrive during the window above to set up your furniture. You don't need to do anything — just be home.";
++  document.getElementById('cdConfirmBtn').textContent = early ? 'Looks Right' : 'Confirm Delivery';
+   document.getElementById('cdStep1').style.display = 'block';
+   document.getElementById('cdStep2').style.display = 'none';
+   document.getElementById('confirmDeliveryModal').classList.add('open');
+@@ -2787,8 +3148,12 @@ function closeConfirmDeliveryModal() {
+ function cdConfirm() {
+   const _dd = window._deliveryDate || {};
+   const dateStr = (_dd.dateMain || 'June 12') + ', ' + (_dd.year || '2026');
+-  document.getElementById('cdSuccessMsg').textContent =
+-    'Your delivery on ' + dateStr + ' from ' + (_dd.slot || '10:00 AM – 2:00 PM') + ' is confirmed. We\'ll see you soon!';
++  document.getElementById('cdOkDate').textContent = dateStr;
++  document.getElementById('cdOkSlot').textContent = _dd.slot || '10:00 AM – 2:00 PM';
++  document.getElementById('cdOkAddr').textContent = _addrLine1() + ', ' + _addrLine2();
++  document.getElementById('cdSuccessMsg').textContent = currentStatus === 3
++    ? "We'll remind you 48 hours before delivery."
++    : "Your delivery is confirmed. We'll see you soon.";
+   document.getElementById('cdStep1').style.display = 'none';
+   document.getElementById('cdStep2').style.display = 'block';
+ }
+@@ -2796,6 +3161,10 @@ function cdReschedule() {
+   document.getElementById('confirmDeliveryModal').classList.remove('open');
+   openReschedule();
+ }
++function cdChangeAddress() {
++  document.getElementById('confirmDeliveryModal').classList.remove('open');
++  openAddressModal();
++}
+ document.getElementById('confirmDeliveryModal').addEventListener('click', function(e){ if(e.target===this) closeConfirmDeliveryModal(); });
+ 
+ // ── Confirm Return Modal ──────────────────────────────────────────────────────
+@@ -3139,12 +3508,137 @@ function downloadReceipts() {
+   doc.save('roomo-receipts-' + BACKEND.user.name.replace(/\s+/g, '-').toLowerCase() + '.pdf');
+ }
+ 
+-function switchStatus(s) { currentStatus=parseInt(s); currentTab='overview'; document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active')); document.querySelector('[data-tab="overview"]').classList.add('active'); renderHero(currentStatus); renderContent(currentStatus,currentTab); }
+-function switchTab(tab) { currentTab=tab; document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active')); document.querySelector(`[data-tab="${tab}"]`).classList.add('active'); renderContent(currentStatus,currentTab); }
++const NAV_LABELS = { overview: 'Overview', plan: 'Current Plan', delivery: 'Delivery', billing: 'Billing', history: 'Order History', support: 'Support', account: 'Account' };
++function _updateNavToggleLabel(tab) { const el = document.getElementById('navToggleLabel'); if (el) el.textContent = NAV_LABELS[tab] || tab; }
++function toggleNavMenu() { const sb = document.querySelector('.sidebar'); const open = sb.classList.toggle('nav-open'); document.getElementById('navToggle').setAttribute('aria-expanded', open ? 'true' : 'false'); }
++function closeNavMenu() { document.querySelector('.sidebar').classList.remove('nav-open'); document.getElementById('navToggle').setAttribute('aria-expanded', 'false'); }
++document.addEventListener('click', function(e) { const sb = document.querySelector('.sidebar'); if (sb && sb.classList.contains('nav-open') && !sb.contains(e.target)) closeNavMenu(); });
++function switchStatus(s) { currentStatus=parseInt(s); currentTab='overview'; document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active')); document.querySelector('[data-tab="overview"]').classList.add('active'); renderHero(currentStatus); renderContent(currentStatus,currentTab); _updateNavToggleLabel('overview'); }
++function switchTab(tab) { currentTab=tab; document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active')); document.querySelector(`[data-tab="${tab}"]`).classList.add('active'); renderContent(currentStatus,currentTab); _updateNavToggleLabel(tab); closeNavMenu(); }
++function _demoBarH() {
++  return parseInt(getComputedStyle(document.documentElement).getPropertyValue('--mobile-demo-bar-height')) || 0;
++}
++/* Align the top of the freshly rendered tab just below the pinned chrome.
++
++   Two things made earlier attempts land short: the chrome height changes depending on
++   whether the compact bar is up, and the scroll listener kept flipping that state
++   mid-flight. So here we decide the end state first, apply it, re-measure after the
++   browser has laid it out, then scroll — with the listener locked for the duration. */
++/* Mobile hero <-> content transition.
++
++   Deliberately arithmetic-free: we always scroll to the very top first, then let the
++   hero collapse to zero height. Because the collapsed hero occupies nothing, the compact
++   bar, profile row and content simply end up stacked from the top of the viewport — there
++   is no landing position to calculate and nothing to drift. Both directions animate. */
++/* Pin the page to the top while the hero animates. The height change makes the browser
++   re-evaluate scroll snapping, which otherwise drags the viewport onto the nearest card
++   mid-transition — that is what left the hero looking half-height. */
++function _holdTop(ms) {
++  const root = document.documentElement;
++  root.classList.add('no-snap');
++  const until = Date.now() + ms;
++  (function hold() {
++    if (window.scrollY !== 0) window.scrollTo(0, 0);
++    if (Date.now() < until) requestAnimationFrame(hold);
++    else root.classList.remove('no-snap');
++  })();
++}
++function collapseHero() {
++  const hero = document.getElementById('heroBanner');
++  if (!hero || hero.classList.contains('is-collapsed')) return;
++  // Back to the top first: the collapsed hero takes no space, so everything below simply
++  // stacks from the top of the viewport and there is no position to compute.
++  hero.classList.add('is-collapsed');
++  hero.setAttribute('aria-hidden', 'true');
++  if ('inert' in hero) hero.inert = true;
++  if (window._setMinibarVisible) window._setMinibarVisible(true);
++  _holdTop(500);
++}
++// Expose so the scroll watcher can fold the hero the moment you scroll off the top.
++window.collapseHero = collapseHero;
++function alignContentTop() {
++  if (window.innerWidth > 768) return;
++  collapseHero();
++  window.scrollTo(0, 0);
++}
++function scrollToOverview() {
++  switchTab('overview');
++  if (window.innerWidth <= 768) { alignContentTop(); return; }
++  document.querySelector('.main-layout').scrollIntoView({ behavior: 'smooth', block: 'start' });
++}
++// Mobile: float the "Overview" hint above the fold, then swap it for a sticky top bar once the sidebar reaches the header.
++(function initMobileScrollAffordance() {
++  const hint = document.getElementById('heroScrollHint');
++  const sidebar = document.querySelector('.sidebar');
++  const bar = document.getElementById('heroMinibar');
++  const hero = document.getElementById('heroBanner');
++  if (!hint || !sidebar) return;
++  let ticking = false;
++  function setMinibar(show) {
++    if (!bar) return;
++    bar.classList.toggle('is-visible', show);
++    bar.setAttribute('aria-hidden', show ? 'false' : 'true');
++    // The compact bar takes the header's place, so hide the ROOMO header while it's up.
++    document.body.classList.toggle('minibar-on', show);
++    _syncChromeVars();
++  }
++  // The compact bar's height isn't final until webfonts land, and the profile row can
++  // reflow too. The bar now lives inside the sidebar, so the only thing pinned above the
++  // sidebar is the ROOMO header (a fixed 56px) or nothing at all — no measured offsets.
++  // --sidebar-h is still observed because scroll-margin-top needs the real total.
++  function _syncChromeVars() {
++    const show = document.body.classList.contains('minibar-on');
++    const root = document.documentElement.style;
++    root.setProperty('--top-chrome-h', show ? '0px' : '56px');
++    root.setProperty('--sidebar-h', sidebar.offsetHeight + 'px');
++  }
++  if (window.ResizeObserver) {
++    const ro = new ResizeObserver(_syncChromeVars);
++    ro.observe(sidebar);
++    if (bar) ro.observe(bar);
++  }
++  if (document.fonts && document.fonts.ready) document.fonts.ready.then(_syncChromeVars);
++  _syncChromeVars();
++  function update() {
++    ticking = false;
++    if (window.innerWidth > 768) {
++      hint.classList.remove('is-hidden');
++      sidebar.classList.remove('is-stuck');
++      setMinibar(false);
++      document.body.classList.remove('minibar-on');
++      return;
++    }
++    const demoH = _demoBarH();
++    // The hero is all-or-nothing: the instant you scroll away from the top it folds into
++    // the compact bar. That removes the half-scrolled banner state entirely — you either
++    // see the full-screen hero, or you see the bar. Tap the chevron to bring it back.
++    if (hero && !hero.classList.contains('is-collapsed') && window.scrollY > 24
++        && Date.now() > _heroGrace) {
++      collapseHero();
++      return;
++    }
++    const heroGone = !hero
++      || hero.classList.contains('is-collapsed')
++      || sidebar.getBoundingClientRect().top <= demoH + 1;
++    setMinibar(heroGone);
++    const stuck = sidebar.getBoundingClientRect().top <= demoH + (heroGone ? 0 : 56) + 1;
++    sidebar.classList.toggle('is-stuck', stuck);
++    hint.classList.toggle('is-hidden', heroGone || stuck);
++  }
++  window._setMinibarVisible = setMinibar; // let tab switching pre-apply the end state
++  function onScroll() { if (!ticking) { ticking = true; requestAnimationFrame(update); } }
++  window.addEventListener('scroll', onScroll, { passive: true });
++  window.addEventListener('resize', onScroll);
++  update();
++})();
+ // URL params: ?demo=true shows demo bar, ?status=N switches status
+ const _urlParams = new URLSearchParams(window.location.search);
+ const _demoMode = _urlParams.has('demo') || _urlParams.has('status');
+-if (_demoMode) { document.querySelector('.demo-bar').style.display = 'flex'; }
++if (_demoMode) {
++  const _demoBar = document.querySelector('.demo-bar');
++  _demoBar.style.display = 'flex';
++  document.documentElement.style.setProperty('--mobile-demo-bar-height', _demoBar.offsetHeight + 'px');
++}
+ const _initStatus = parseInt(_urlParams.get('status')) || 3;
+ switchStatus(_initStatus);
+ </script>
+@@ -3155,7 +3649,7 @@ switchStatus(_initStatus);
+   .auth-card{width:100%;max-width:380px;background:#fff;border:1px solid #E8E0D6;border-radius:16px;padding:28px 24px;box-shadow:0 8px 40px rgba(73,55,42,0.10);}
+   .auth-logo{font-family:'MuseoModerno','Trebuchet MS',sans-serif;font-weight:800;font-size:22px;color:#49372A;text-align:center;letter-spacing:0.02em;margin-bottom:4px;}
+   .auth-title{font-size:18px;font-weight:700;color:#49372A;text-align:center;margin:8px 0 4px;}
+-  .auth-sub{font-size:13px;color:#8B7355;text-align:center;line-height:1.5;margin-bottom:18px;}
++  .auth-sub{font-size:13px;color:#8B7355;text-align:center;line-height:1.25;margin-bottom:18px;}
+   .auth-input{width:100%;box-sizing:border-box;padding:11px 13px;border:1.5px solid #E8E0D6;border-radius:10px;font-family:inherit;font-size:14px;color:#49372A;outline:none;background:#fff;margin-bottom:10px;}
+   .auth-btn{width:100%;box-sizing:border-box;padding:12px 0;border-radius:999px;border:none;background:#49372A;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;}
+   .auth-btn.secondary{background:#fff;color:#49372A;border:1.5px solid #E8E0D6;}
