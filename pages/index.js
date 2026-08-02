@@ -249,7 +249,7 @@ function CheckoutForm({ amount, deliveryFee, portalLink, summary }) {
           No charge is captured until delivery is confirmed.
         </div>
 
-        {/* Order card */}
+        {/* Order card — stacked so multi-set item lines never get squeezed */}
         {(deliveryDate || items.length > 0) && (
           <div
             style={{
@@ -257,13 +257,17 @@ function CheckoutForm({ amount, deliveryFee, portalLink, summary }) {
               borderRadius: 12,
               padding: "16px 18px",
               margin: "18px 0 12px",
-              display: "flex",
-              justifyContent: "space-between",
-              gap: 14,
             }}
           >
             {deliveryDate && (
-              <div>
+              <div
+                style={{
+                  marginBottom: items.length > 0 ? 14 : 0,
+                  paddingBottom: items.length > 0 ? 14 : 0,
+                  borderBottom:
+                    items.length > 0 ? `1px solid ${C.border}` : "none",
+                }}
+              >
                 <div
                   style={{
                     fontFamily: font,
@@ -301,7 +305,7 @@ function CheckoutForm({ amount, deliveryFee, portalLink, summary }) {
               </div>
             )}
             {items.length > 0 && (
-              <div style={{ textAlign: "right", flex: 1 }}>
+              <div>
                 <div
                   style={{
                     fontFamily: font,
@@ -310,7 +314,7 @@ function CheckoutForm({ amount, deliveryFee, portalLink, summary }) {
                     color: C.brownMuted,
                     letterSpacing: "0.05em",
                     textTransform: "uppercase",
-                    marginBottom: 4,
+                    marginBottom: 6,
                   }}
                 >
                   Items
@@ -322,7 +326,7 @@ function CheckoutForm({ amount, deliveryFee, portalLink, summary }) {
                       fontFamily: font,
                       fontSize: 13,
                       color: C.brown,
-                      lineHeight: 1.5,
+                      lineHeight: 1.6,
                     }}
                   >
                     {formatItemLine(it)}
