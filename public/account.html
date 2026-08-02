@@ -1279,7 +1279,7 @@ function normalizeColorSlug(raw) {
     'merlot': 'soho-merlot', 'soho merlot': 'soho-merlot', 'soho': 'soho-merlot',
     'almond': 'almond-breeze', 'almond breeze': 'almond-breeze', 'breeze': 'almond-breeze',
     'carbon': 'carbon-black', 'carbon black': 'carbon-black', 'black': 'carbon-black',
-    'color theory': 'color-theory', 'theory': 'color-theory'
+    'color theory': 'color-theory', 'colortheory': 'color-theory', 'theory': 'color-theory'
   };
   return aliasMap[s] || s;
 }
@@ -1673,13 +1673,20 @@ const STATUS = {
 
 function planCard(s, bc, bt, full=false) {
   const _cp = getPlanForStatus(s);
+  const _items = (BACKEND.planItems && BACKEND.planItems.length) ? BACKEND.planItems : [_cp];
+  const _title = _items.length > 1
+    ? (setLabel(_items[0].setId) + ' Set +' + (_items.length - 1) + ' more')
+    : (setLabel(_cp.setId) + ' Set');
+  const _sub = _items.length > 1
+    ? (_items.length + ' sets')
+    : colorDisplayName(_cp.colorSlug);
   return `<div class="card card-plan-h ${full?'card-full':''} animate-in">
     ${planImageBlock(s)}
     <div class="plan-content">
       <div class="card-header"><span class="card-title">Current Plan</span><span class="card-badge ${bc}">${bt}</span></div>
       <div style="margin-bottom:var(--space-md)">
-        <div style="font-family:var(--font-heading);font-weight:700;font-size:17px;color:var(--text-primary);margin-bottom:8px">${setLabel(_cp.setId)} Set</div>
-        <div style="font-size:13px;color:var(--text-secondary)">${colorDisplayName(_cp.colorSlug)}</div>
+        <div style="font-family:var(--font-heading);font-weight:700;font-size:17px;color:var(--text-primary);margin-bottom:8px">${_title}</div>
+        <div style="font-size:13px;color:var(--text-secondary)">${_sub}</div>
       </div>
       <div style="border-top:1px solid var(--border-light);padding-top:var(--space-md)">
         <div class="card-row"><span class="card-row-label">Next Payment</span><span class="card-row-value">${BACKEND.billing.nextDueDateFull}</span></div>
