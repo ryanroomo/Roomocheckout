@@ -2074,7 +2074,7 @@ function planDetailCard(s, bc, bt) {
         </div>
         <div style="padding:var(--space-sm)">
           <div style="font-size:11px;font-weight:500;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Monthly</div>
-          <div style="font-family:var(--font-heading);font-weight:700;font-size:15px;color:var(--text-primary)">$${window._extendedTerm ? window._extendedTerm.monthly : planMonthly(_plan)}</div>
+          <div style="font-family:var(--font-heading);font-weight:700;font-size:15px;color:var(--text-primary)">$${Number(window._extendedTerm ? window._extendedTerm.monthly : planMonthly(_plan)).toFixed(2)}</div>
         </div>
       </div>
       <div style="margin-bottom:var(--space-md)">
@@ -2098,7 +2098,7 @@ function planDetailCard(s, bc, bt) {
       <div style="flex:1;min-width:0">
         <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline">
           <div style="font-family:var(--font-heading);font-weight:700;font-size:16px;color:var(--text-primary)">${setLabel(p.setId)} Set</div>
-          <div style="font-family:var(--font-heading);font-weight:700;font-size:15px;color:var(--text-primary);white-space:nowrap">$${planMonthly(p)}<span style="font-size:12px;color:var(--text-muted);font-weight:400">/mo</span></div>
+          <div style="font-family:var(--font-heading);font-weight:700;font-size:15px;color:var(--text-primary);white-space:nowrap">$${planMonthly(p).toFixed(2)}<span style="font-size:12px;color:var(--text-muted);font-weight:400">/mo</span></div>
         </div>
         <div style="font-size:12px;color:var(--text-secondary);margin:2px 0 4px">${colorDisplayName(p.colorSlug)} · ${p.months}-month rental</div>
         <div style="font-size:12px;color:var(--text-muted);line-height:1.5">${getIncludedItemsList(p)}</div>
@@ -2120,7 +2120,7 @@ function planDetailCard(s, bc, bt) {
       </div>
       <div style="padding:var(--space-sm)">
         <div style="font-size:11px;font-weight:500;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Total /mo</div>
-        <div style="font-family:var(--font-heading);font-weight:700;font-size:15px;color:var(--text-primary)">$${_total}</div>
+        <div style="font-family:var(--font-heading);font-weight:700;font-size:15px;color:var(--text-primary)">$${Number(_total).toFixed(2)}</div>
       </div>
     </div>
     <div style="margin-bottom:var(--space-md)">
@@ -2347,7 +2347,7 @@ function _renderContent(s, tab) {
     }
   } else if(tab==='history') {
     if(s<=2) area.innerHTML=`<div class="empty-state"><div class="empty-state-title">No order history yet.</div><div class="empty-state-body">Your past Roomo rental plans and product orders will appear here after you place an order.</div><a class="btn btn-primary" href="https://www.roomonyc.com/living-detail-page" target="_blank">Browse Roomo Sets</a></div>`;
-    else area.innerHTML=`<div class="cards-grid"><div class="card card-plan-h card-full animate-in">${planImageBlock(s)}<div class="plan-content"><div class="card-header"><span class="card-title">${setLabel(CONFIRMED_PLAN.setId)} Set</span><span class="card-badge ${s===9?'badge-completed':'badge-active'}">${s===9?'Completed':'Active'}</span></div><div style="margin-bottom:var(--space-md)"><div style="font-family:var(--font-heading);font-weight:700;font-size:17px;color:var(--text-primary);margin-bottom:8px">${setLabel(CONFIRMED_PLAN.setId)} Set</div><div style="font-size:13px;color:#816E68">${colorDisplayName(CONFIRMED_PLAN.colorSlug)} · ${CONFIRMED_PLAN.months}-month rental</div></div><div style="border-top:1px solid var(--border-light);padding-top:var(--space-md)"><div class="card-row"><span class="card-row-label">Lease Start</span><span class="card-row-value">${BACKEND.lease.startDateFull}</span></div><div class="card-row"><span class="card-row-label">Lease End</span><span class="card-row-value">${BACKEND.lease.endDateFull}</span></div><div class="card-row"><span class="card-row-label">Monthly</span><span class="card-row-value">$${planMonthly(CONFIRMED_PLAN)} / month</span></div>${s===9?`<div class="card-row"><span class="card-row-label">Total Paid</span><span class="card-row-value">${BACKEND.billing.totalPaid}</span></div>`:''}</div><div style="border-top:1px solid var(--border-light);padding-top:var(--space-md);margin-top:var(--space-md)"><div class="card-row"><span class="card-row-label">Items</span><span class="card-row-value">${getIncludedItemsList(CONFIRMED_PLAN)}</span></div></div><div class="card-actions"><a class="btn btn-ghost" href="#" onclick="downloadReceipts();return false;">Download Receipts</a></div></div></div></div>`;
+    else area.innerHTML=`<div class="cards-grid"><div class="card card-plan-h card-full animate-in">${planImageBlock(s)}<div class="plan-content"><div class="card-header"><span class="card-title">${setLabel(CONFIRMED_PLAN.setId)} Set</span><span class="card-badge ${s===9?'badge-completed':'badge-active'}">${s===9?'Completed':'Active'}</span></div><div style="margin-bottom:var(--space-md)"><div style="font-family:var(--font-heading);font-weight:700;font-size:17px;color:var(--text-primary);margin-bottom:8px">${setLabel(CONFIRMED_PLAN.setId)} Set</div><div style="font-size:13px;color:#816E68">${colorDisplayName(CONFIRMED_PLAN.colorSlug)} · ${CONFIRMED_PLAN.months}-month rental</div></div><div style="border-top:1px solid var(--border-light);padding-top:var(--space-md)"><div class="card-row"><span class="card-row-label">Lease Start</span><span class="card-row-value">${BACKEND.lease.startDateFull}</span></div><div class="card-row"><span class="card-row-label">Lease End</span><span class="card-row-value">${BACKEND.lease.endDateFull}</span></div><div class="card-row"><span class="card-row-label">Monthly</span><span class="card-row-value">$${planMonthly(CONFIRMED_PLAN).toFixed(2)} / month</span></div>${s===9?`<div class="card-row"><span class="card-row-label">Total Paid</span><span class="card-row-value">${BACKEND.billing.totalPaid}</span></div>`:''}</div><div style="border-top:1px solid var(--border-light);padding-top:var(--space-md);margin-top:var(--space-md)"><div class="card-row"><span class="card-row-label">Items</span><span class="card-row-value">${getIncludedItemsList(CONFIRMED_PLAN)}</span></div></div><div class="card-actions"><a class="btn btn-ghost" href="#" onclick="downloadReceipts();return false;">Download Receipts</a></div></div></div></div>`;
   } else if(tab==='support') {
     area.innerHTML=`<div style="text-align:center;max-width:520px;margin:0 auto;padding-top:var(--space-lg)"><h2 style="font-family:var(--font-heading);font-weight:700;font-size:24px;margin-bottom:var(--space-lg)">How can we help?</h2><p style="font-size:14px;color:#816E68;line-height:1.25;font-weight:400;margin-bottom:var(--space-lg)">Contact Roomo for delivery changes, billing questions, furniture care, swaps, returns, or general support.</p><a class="btn btn-primary" href="https://www.roomonyc.com/support" target="_blank">Contact Support</a><p style="font-size:12px;color:#816E68;margin-top:var(--space-sm);font-weight:400">hello@roomonyc.com</p></div>`;
   } else if(tab==='account') {
@@ -3563,7 +3563,7 @@ function downloadReceipts() {
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(100);
   doc.text(BACKEND.user.email, 20, y);
-  doc.text(plan.months + '-month rental · $' + planMonthly(plan) + '/mo', W / 2, y);
+  doc.text(plan.months + '-month rental · $' + planMonthly(plan).toFixed(2) + '/mo', W / 2, y);
   y += 5;
   doc.text('Payment: ' + pm.brand + ' ···· ' + pm.last4, 20, y);
   doc.text(BACKEND.lease.startDateFull + ' – ' + BACKEND.lease.endDateFull, W / 2, y);
