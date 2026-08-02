@@ -959,10 +959,11 @@ tbody tr:last-child td {
             <option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option><option selected>12</option>
           </select></label>
         </div>
-        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;font-size:13px;color:var(--text)">
-          <label><input type="checkbox" id="pvMattress" checked> Mattress (bedding)</label>
-          <label><input type="checkbox" id="pvLamp" checked> Floor lamp (living)</label>
-          <label><input type="checkbox" id="pvPlant" checked> Plant (living/dining)</label>
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px">Optional items <span style="color:var(--muted)">(uncheck to remove — only items this set actually offers are shown)</span></div>
+        <div id="pvToggles" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;font-size:13px;color:var(--text)">
+          <label id="pvMattressWrap"><input type="checkbox" id="pvMattress" checked> Mattress</label>
+          <label id="pvLampWrap"><input type="checkbox" id="pvLamp" checked> Floor lamp</label>
+          <label id="pvPlantWrap"><input type="checkbox" id="pvPlant" checked> Plant</label>
         </div>
         <button id="pvOpen" class="btn-primary" style="padding:10px 22px;border-radius:8px;border:none;background:var(--text);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Open preview →</button>
         <div style="margin-top:16px">
@@ -2020,6 +2021,34 @@ function _pvLink() {
   p.set('plant', document.getElementById('pvPlant').checked ? '1' : '0');
   return '/account.html?' + p.toString();
 }
+// Each set only offers certain removable items — mirror the real portal:
+//   living  → floor lamp + plant     dining → plant     bedding → mattress
+function _pvUpdateToggles(){
+  var set = document.getElementById('pvSet').value;
+  var show = ({
+    living:  { lamp:true,  plant:true,  mattress:false },
+    dining:  { lamp:false, plant:true,  mattress:false },
+    bedding: { lamp:false, plant:false, mattress:true  },
+  })[set] || { lamp:false, plant:false, mattress:false };
+  document.getElementById('pvLampWrap').style.display     = show.lamp     ? '' : 'none';
+  document.getElementById('pvPlantWrap').style.display    = show.plant    ? '' : 'none';
+  document.getElementById('pvMattressWrap').style.display = show.mattress ? '' : 'none';
+  // Hidden = not offered → force "included" so it never accidentally excludes.
+  if(!show.lamp)     document.getElementById('pvLamp').checked = true;
+  if(!show.plant)    document.getElementById('pvPlant').checked = true;
+  if(!show.mattress) document.getElementById('pvMattress').checked = true;
+  // Colors are set-specific — rebuild the dropdown so previews never point at a
+  // non-existent image (e.g. a Living set in a Dining-only color).
+  var colors = (set === 'dining')
+    ? [['almond-breeze','Almond Breeze'],['carbon-black','Carbon Black'],['color-theory','Color Theory']]
+    : [['hudson-haze','Hudson Haze'],['soho-merlot','Soho Merlot'],['central-moss','Central Moss']];
+  var csel = document.getElementById('pvColor');
+  var prev = csel.value;
+  csel.innerHTML = colors.map(function(c){ return '<option value="'+c[0]+'">'+c[1]+'</option>'; }).join('');
+  if(colors.some(function(c){ return c[0]===prev; })) csel.value = prev;
+}
+document.getElementById('pvSet').addEventListener('change', _pvUpdateToggles);
+_pvUpdateToggles();
 document.getElementById('pvOpen').addEventListener('click', function(){ window.open(_pvLink(), '_blank'); });
 (function(){
   var wrap = document.getElementById('pvQuick');
