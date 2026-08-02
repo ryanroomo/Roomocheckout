@@ -1342,9 +1342,18 @@ const DEMO_BACKEND = {
 };
 
 // ─── API → BACKEND mapper ────────────────────────────────────────────────────
+// Date-only strings ("2026-08-26") parse as UTC midnight, which displays as the
+// PREVIOUS day in negative-offset timezones (e.g. New York). Force local noon so
+// the calendar day never shifts. Timestamps (with a "T") are left untouched.
+function _localDate(s) {
+  if (!s) return new Date(NaN);
+  s = String(s);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) s += 'T12:00:00';
+  return new Date(s);
+}
 function _fmtDate(iso, style) {
   if (!iso) return '';
-  const d = new Date(iso);
+  const d = _localDate(iso);
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const monthsShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   if (style === 'short') return monthsShort[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
@@ -1416,7 +1425,7 @@ function mapApiToBackend(api) {
   var delivDateMain = '', delivYear = '';
   if (deliveryDate) {
     delivDateMain = _fmtDate(deliveryDate, 'dateMain');
-    delivYear = new Date(deliveryDate).getFullYear().toString();
+    delivYear = _localDate(deliveryDate).getFullYear().toString();
   }
 
   // Address from API (separate fields)
@@ -1527,7 +1536,7 @@ function loadPortalData(authHeader) {
       };
       // Set delivery date from API for card rendering
       if (data.order && data.order.deliveryDate) {
-        var dd = new Date(data.order.deliveryDate);
+        var dd = _localDate(data.order.deliveryDate);
         var mFull = ['January','February','March','April','May','June','July','August','September','October','November','December'];
         var dNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
         window._deliveryDate = {
@@ -1539,7 +1548,7 @@ function loadPortalData(authHeader) {
       }
       // Set return pickup date from API if return is scheduled
       if (data.order && data.order.returnDate) {
-        var rd = new Date(data.order.returnDate);
+        var rd = _localDate(data.order.returnDate);
         var mFullR = ['January','February','March','April','May','June','July','August','September','October','November','December'];
         var dNamesR = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
         window._returnPickup = {
@@ -3364,8 +3373,8 @@ switchStatus(_initStatus);
       demoPlan={ setId:BACKEND.plan.setId, colorSlug:BACKEND.plan.colorSlug, months:6, omit:BACKEND.plan.omit };
       var mF=['January','February','March','April','May','June','July','August','September','October','November','December'];
       var dN=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-      if(data.order.deliveryDate){ var dd=new Date(data.order.deliveryDate); window._deliveryDate={dateMain:mF[dd.getMonth()]+' '+dd.getDate(), year:dd.getFullYear().toString(), dayName:dN[dd.getDay()], slot:data.order.deliverySlot}; }
-      if(data.order.returnDate){ var rd=new Date(data.order.returnDate); window._returnPickup={dateMain:mF[rd.getMonth()]+' '+rd.getDate(), year:rd.getFullYear().toString(), dayName:dN[rd.getDay()], slot:'9:00 AM – 1:00 PM'}; }
+      if(data.order.deliveryDate){ var dd=_localDate(data.order.deliveryDate); window._deliveryDate={dateMain:mF[dd.getMonth()]+' '+dd.getDate(), year:dd.getFullYear().toString(), dayName:dN[dd.getDay()], slot:data.order.deliverySlot}; }
+      if(data.order.returnDate){ var rd=_localDate(data.order.returnDate); window._returnPickup={dateMain:mF[rd.getMonth()]+' '+rd.getDate(), year:rd.getFullYear().toString(), dayName:dN[rd.getDay()], slot:'9:00 AM – 1:00 PM'}; }
       currentStatus=data.step;
       var sn=document.getElementById('sidebarName'), se=document.getElementById('sidebarEmail');
       if(sn) sn.textContent=BACKEND.user.name; if(se) se.textContent=BACKEND.user.email;
