@@ -1447,13 +1447,19 @@ function holdStateLabel(state) {
 // Returns { date, cycle } where cycle 1 = the first subscription charge
 // (= rental month 2, since month 1 was paid at capture).
 function nextSubscriptionCycle(o) {
-  if (!o.deliveredAt) return null;
-  const start = new Date(o.deliveredAt).getTime();
+  // Anchor on the customer's chosen DELIVERY date and step by whole CALENDAR
+  // months (cycle 1 = delivery + 1 month = rental month 2), not deliveredAt +
+  // 30-day multiples — otherwise the charge day drifts a few days each month.
+  var anchorStr = o.deliveryDate || o.deliveredAt;
+  if (!anchorStr) return null;
+  var s = String(anchorStr);
+  var base = /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(s + 'T12:00:00') : new Date(s);
   const end = o.subscriptionEndsAt ? new Date(o.subscriptionEndsAt).getTime() : Infinity;
   const now = Date.now();
   for (let k = 1; k <= 36; k++) {
-    const t = start + k * 30 * 24 * 3600 * 1000;
-    if (t > now && t <= end) return { date: new Date(t), cycle: k };
+    const d = new Date(base.getTime()); d.setMonth(d.getMonth() + k);
+    const t = d.getTime();
+    if (t > now && t <= end) return { date: d, cycle: k };
   }
   return null;
 }
