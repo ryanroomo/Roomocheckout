@@ -39,7 +39,7 @@ const STATE_KEYS: Record<SetType, { state: string; listeners: string }> = {
 }
 
 const DEFAULTS: Record<SetType, any> = {
-    living: { months: 12, hasLamp: true, hasPlant: true, palette: "hudson" },
+    living: { months: 12, hasLamp: true, hasPlant: true, palette: "soho" },
     dining: { months: 12, hasPlant: true, palette: "almond" },
     bedding: { months: 12, hasMattress: true, palette: "hudson" },
 }
@@ -415,6 +415,10 @@ export default function RoomoPriceCard(props: any) {
 
     const handleStart = () => {
         const s = getRentalState(set as SetType)
+        // Fallback so an order can never be saved with a missing/wrong colour:
+        // if no palette was picked, use this set's default (Living → Soho Merlot,
+        // Bedding → Hudson Haze, Dining → Almond Breeze).
+        const palette = (s && s.palette) || DEFAULTS[set as SetType].palette
         const { included, excluded } = getAccessories(set as SetType, s)
         const image = getGalleryImage()
         const p = getPrice(set as SetType, s)
@@ -423,7 +427,7 @@ export default function RoomoPriceCard(props: any) {
             id: `${set}-rent-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             set,
             mode: "rent",
-            palette: s.palette || "",
+            palette,
             months: s.months,
             price: p,
             accessories: included,

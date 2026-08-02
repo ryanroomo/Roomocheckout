@@ -1452,6 +1452,14 @@ function normalizeColorSlug(raw) {
   };
   return aliasMap[s] || s;
 }
+// Colour a set is shown in when the order never captured a palette (older
+// pre-fix orders). Mirrors the site's per-set default so the portal shows the
+// colour the customer most likely saw, not a blanket hudson-haze.
+function _defaultColorForSet(setId) {
+  if (setId === 'living') return 'soho-merlot';
+  if (setId === 'dining') return 'almond-breeze';
+  return 'hudson-haze';
+}
 function colorDisplayName(slug) {
   const map = { 'hudson-haze': 'Hudson Haze', 'soho-merlot': 'Soho Merlot', 'central-moss': 'Central Moss', 'almond-breeze': 'Almond Breeze', 'carbon-black': 'Carbon Black', 'color-theory': 'Color Theory' };
   return map[slug] || slug;
@@ -1536,7 +1544,7 @@ function mapApiToBackend(api) {
   // Determine set, color, months, omit from first rental item
   const item = (api.items && api.items[0]) || {};
   const setId = item.setType || 'living';
-  const colorSlug = normalizeColorSlug(item.palette || 'hudson-haze');
+  const colorSlug = normalizeColorSlug(item.palette || _defaultColorForSet(setId));
   const months = item.months || 12;
   // LOCKED price: whatever the customer actually agreed to at checkout — stored
   // per item as pricePerMonth (already includes any bundle / promo discount).
@@ -1622,7 +1630,7 @@ function mapApiToBackend(api) {
       var hx2 = function(kw){ return exLower2.some(function(x){ return x.indexOf(kw) >= 0; }); };
       return {
         setId: it.setType || 'living',
-        colorSlug: normalizeColorSlug(it.palette || 'hudson-haze'),
+        colorSlug: normalizeColorSlug(it.palette || _defaultColorForSet(it.setType || 'living')),
         months: it.months || 12,
         omit: { noLamp: hx2('lamp'), noPlant: hx2('plant'), noMattress: hx2('mattress') },
         monthly: (it.pricePerMonth != null && it.pricePerMonth > 0) ? it.pricePerMonth : 0
