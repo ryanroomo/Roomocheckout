@@ -69,17 +69,14 @@ export default async function handler(req, res) {
       mode: i.mode || (Number(i.months) > 0 ? "rent" : "buy-new"),
     }));
 
-    // ── Auto 3-set bundle discount ───────────────────────────
-    // If the cart contains all three sets (living + dining + bedding), in ANY
-    // combination of rent/buy, every item gets 5% off. This is a permanent
-    // price cut — it applies every month for the whole term — so we bake it
-    // straight into the stored amounts. That way it flows through the first
-    // month, the security deposit, the monthly subscription and the buyout
-    // automatically. It STACKS with coupon codes, which are computed below
-    // against these already-reduced amounts (i.e. discounts compound).
-    const BUNDLE_SETS = ["living", "dining", "bedding"];
-    const setTypesInCart = new Set(normalized.map((i) => i.set));
-    const isBundle = BUNDLE_SETS.every((s) => setTypesInCart.has(s));
+    // ── Auto 3-item bundle discount ──────────────────────────
+    // Any 3 or more items in the cart (any sets, any rent/buy mix) get 5% off.
+    // This is a permanent price cut — it applies every month for the whole
+    // term — so we bake it straight into the stored amounts. That way it flows
+    // through the first month, the security deposit, the monthly subscription
+    // and the buyout automatically. It STACKS with coupon codes, which are
+    // computed below against these already-reduced amounts (discounts compound).
+    const isBundle = normalized.length >= 3;
     const bundlePct = isBundle ? 5 : 0;
 
     // Effective per-item price in cents, after the bundle discount.

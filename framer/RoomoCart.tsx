@@ -437,15 +437,11 @@ function StepCart({
     const buyItems = cart.filter((i) => i.mode === "buy-new")
     const totalMonthly = rentItems.reduce((sum, i) => sum + i.price, 0)
     const totalBuy = buyItems.reduce((sum, i) => sum + i.price, 0)
-    // Auto 3-set bundle: all three sets in the cart (any rent/buy mix) → 5% off
-    // everything, every month. Display only — the server recomputes the real
-    // amounts in create-payment-intent.js, so the customer is charged the
-    // reduced price regardless. Stacks with coupon codes.
-    const bundlePct = ["living", "dining", "bedding"].every((s) =>
-        cart.some((i) => i.set === s)
-    )
-        ? 5
-        : 0
+    // Auto 3-item bundle: 3 or more items in the cart (any sets, any rent/buy
+    // mix) → 5% off everything, every month. Display only — the server
+    // recomputes the real amounts in create-payment-intent.js, so the customer
+    // is charged the reduced price regardless. Stacks with coupon codes.
+    const bundlePct = cart.length >= 3 ? 5 : 0
     const bundledMonthly = Math.round(totalMonthly * (1 - bundlePct / 100))
     const [couponInput, setCouponInput] = useState(couponState.code || "")
 
@@ -668,7 +664,7 @@ function StepCart({
                     fontFamily: font, fontSize: 12, color: C.green, fontWeight: 600,
                     marginBottom: 8, padding: "0 4px",
                 }}>
-                    <span>3-set bundle (5% off)</span>
+                    <span>Bundle (5% off)</span>
                     <span>-${totalMonthly - bundledMonthly}/mo</span>
                 </div>
             )}
