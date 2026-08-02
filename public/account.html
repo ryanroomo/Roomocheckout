@@ -1558,7 +1558,16 @@ function mapApiToBackend(api) {
 
   // Dates
   const startDate = api.order ? (api.order.deliveryDate || api.order.createdAt) : null;
-  const endDate = api.order ? api.order.subscriptionEndsAt : null;
+  // Lease end = start (delivery) date + the longest rental term, in whole
+  // calendar months. NOT the Stripe 30-day-based subscription end, which drifts.
+  var _leaseMonths = (api.items || [])
+    .filter(function(i){ return i.mode !== 'buy-new'; })
+    .reduce(function(m, i){ return Math.max(m, i.months || 0); }, 0) || months;
+  var endDate = api.order ? api.order.subscriptionEndsAt : null;
+  if (startDate && _leaseMonths) {
+    var _end = _localDate(startDate); _end.setMonth(_end.getMonth() + _leaseMonths);
+    endDate = _end.toISOString();
+  }
   const deliveryDate = api.order ? api.order.deliveryDate : null;
 
   // Next due date = one month after last payment, or one month after start
