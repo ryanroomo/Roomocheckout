@@ -1005,6 +1005,18 @@ tbody tr:last-child td {
         <div style="font-size:12px;color:var(--text-secondary);margin:6px 0 6px">Existing agent codes</div>
         <div id="acList" style="font-size:13px;color:var(--text)"></div>
       </div>
+
+      <div class="section-card" style="padding:24px 28px">
+        <h3 style="margin:0 0 4px">Early move-in email</h3>
+        <p style="color:var(--text-secondary);font-size:13px;margin:0 0 14px">Sends the "have your home ready before you arrive" email (Option 1 / Option 2). The first name is used in the greeting. Reply-To is hello@roomonyc.com, so the customer's reply lands in your inbox.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+          <input id="mvEmail" class="search-input" type="email" placeholder="customer@email.com" style="flex:2;min-width:200px">
+          <input id="mvName" class="search-input" type="text" placeholder="First name (e.g. Paul)" style="flex:1;min-width:140px">
+          <button id="mvSend" class="btn-primary" style="padding:9px 20px;border-radius:8px;border:none;background:var(--text);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Send email</button>
+        </div>
+        <div id="mvErr" style="display:none;font-size:13px;color:var(--red);background:var(--red-bg);border-radius:8px;padding:8px 12px;margin-bottom:10px"></div>
+        <div id="mvOk" style="display:none;font-size:14px;color:#4A7C59;background:var(--green-bg);border-radius:8px;padding:10px 12px"></div>
+      </div>
     </div>
 
   </div>
@@ -2169,6 +2181,28 @@ document.getElementById('acGen').addEventListener('click', async function(){
     acLoadList();
   } catch (err) { var e2 = document.getElementById('acErr'); e2.textContent = err.message; e2.style.display = 'block'; }
   this.textContent = 'Create code'; this.disabled = false;
+});
+
+// ─── Early move-in email ───
+document.getElementById('mvSend').addEventListener('click', async function(){
+  var email = document.getElementById('mvEmail').value.trim();
+  var name = document.getElementById('mvName').value.trim();
+  var errEl = document.getElementById('mvErr'), okEl = document.getElementById('mvOk');
+  errEl.style.display = 'none'; okEl.style.display = 'none';
+  if (!email || email.indexOf('@') < 1) { errEl.textContent = 'Enter a valid email.'; errEl.style.display = 'block'; return; }
+  this.textContent = 'Sending...'; this.disabled = true;
+  try {
+    var r = await fetch('/api/admin/send-movein', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getPassword() },
+      body: JSON.stringify({ email: email, name: name })
+    });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Failed');
+    okEl.textContent = 'Sent to ' + email + (name ? ' (' + name + ')' : '') + '.';
+    okEl.style.display = 'block';
+  } catch (err) { errEl.textContent = err.message; errEl.style.display = 'block'; }
+  this.textContent = 'Send email'; this.disabled = false;
 });
 
 // ─── Init ───
