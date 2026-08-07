@@ -560,7 +560,7 @@
 
     <div class="deadline-card">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#865651" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-      <span>You have 48 hours to report any missing items, major damage, or assembly issues.<br><strong>Report issues by <span id="deadlineText"></span></strong></span>
+      <span>After your delivery is completed, you have a <strong>48-hour window</strong> to review everything and report any missing items, major damage, or assembly issues.</span>
     </div>
 
     <section style="border-top:none; padding-top:22px;">
@@ -588,7 +588,7 @@
 
     <section class="statement">
       <p class="section-label">Confirmation Statement</p>
-      <p>I've reviewed the virtual inspection media for my order. I understand that I have <span class="deadline">48 hours</span> after the applicable delivery or move-in time to check for any missing items, major damage, or assembly issues. If nothing is reported within that period, my order is considered complete and to have passed inspection under Roomo's rental terms.</p>
+      <p>I've reviewed the virtual inspection media for my order. I understand that I have a <span class="deadline">48-hour window</span> after my delivery is completed to check for any missing items, major damage, or assembly issues. If nothing is reported within that period, my order is considered complete and to have passed inspection under Roomo's rental terms.</p>
 
       <label class="agree">
         <input type="checkbox" id="agreeBox" onchange="checkFormValid()">
@@ -637,7 +637,7 @@
     <h2>Delivery confirmed</h2>
     <p>Thank you for confirming — your order is now officially underway, and we'll finalize your payment as scheduled. Nothing more you need to do.<br>We hope your new place already feels like home.</p>
     <p style="font-family:'Manrope',sans-serif; font-size:17px; font-weight:700; color:var(--brown-accent); margin:0 0 22px;">Let's Roomo.</p>
-    <div class="success-deadline">You can report any missing items or assembly issues until <strong id="successDeadline"></strong>.</div>
+    <div class="success-deadline">You can report any missing items or assembly issues within <strong>48 hours</strong> of your delivery being completed.</div>
     <br>
     <a href="#" id="successReportLink" onclick="reportIssue(); return false;">Report an issue</a>
   </div>
@@ -691,6 +691,13 @@
         const r = await fetch('/api/inspection/order?token=' + encodeURIComponent(CUSTOMER_TOKEN));
         const d = await r.json();
         if (!r.ok) throw new Error(d.error || 'Could not load your inspection.');
+        // Already confirmed? Show the confirmed screen — never ask again.
+        if (d.inspection && d.inspection.status === 'confirmed') {
+          document.getElementById('formBody').classList.add('hide');
+          document.getElementById('successState').classList.add('show');
+          window.scrollTo(0, 0);
+          return;
+        }
         const media = (d.inspection && d.inspection.media) || {};
         ROOMO_INSPECTION = {
           orderId: d.orderShort,
@@ -731,13 +738,11 @@
   }
 
   function renderAll() {
-    document.getElementById('deadlineText').textContent = ROOMO_INSPECTION.inspectionDeadline;
     document.getElementById('orderIdText').textContent = ROOMO_INSPECTION.orderId;
     document.getElementById('custNameText').textContent = ROOMO_INSPECTION.customerName;
     document.getElementById('addressText').textContent = ROOMO_INSPECTION.deliveryAddress;
     document.getElementById('deliveryDateText').textContent = ROOMO_INSPECTION.deliveryDate;
     document.getElementById('termsLink').href = ROOMO_INSPECTION.rentalTermsUrl;
-    document.getElementById('successDeadline').textContent = ROOMO_INSPECTION.inspectionDeadline;
     document.getElementById('printedName').value = ROOMO_INSPECTION.customerName;
     renderSets();
     enhanceVideoThumbs();

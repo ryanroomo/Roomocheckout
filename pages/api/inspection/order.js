@@ -102,8 +102,9 @@ export default async function handler(req, res) {
       };
     }
 
-    // 48h report-by deadline, anchored on actual delivery/handover time
-    const deadlineBase = order.delivered_at || inspection?.submitted_at || null;
+    // 48h report window is FIXED at the moment the worker submitted the
+    // inspection — never computed from when the customer opens the link.
+    const deadlineBase = inspection?.submitted_at || null;
     const inspectionDeadline = deadlineBase ? fmtDeadline(deadlineBase) : null;
 
     return res.status(200).json({

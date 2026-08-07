@@ -30,15 +30,6 @@ function verifyAdmin(req) {
   return !!pw && (pw === process.env.ADMIN_PASSWORD || pw === process.env.ADMIN_SECRET);
 }
 
-// "August 12, 2026 at 5:00 PM" in NY time — 48h after delivery/handover.
-function deadline48h(baseIso) {
-  const base = baseIso ? new Date(baseIso) : new Date();
-  const d = new Date(base.getTime() + 48 * 60 * 60 * 1000);
-  const date = d.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "long", day: "numeric", year: "numeric" });
-  const time = d.toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" });
-  return `${date} at ${time}`;
-}
-
 export default async function handler(req, res) {
   setCors(res);
   if (req.method === "OPTIONS") return res.status(204).end();
@@ -85,7 +76,6 @@ export default async function handler(req, res) {
       email,
       name,
       inspectionUrl,
-      deadlineText: deadline48h(order.delivered_at || inspection?.submitted_at),
       sets,
     });
 
