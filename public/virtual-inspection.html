@@ -68,15 +68,14 @@
   /* ---------- illustration placeholder ---------- */
   .inspection-illustration {
     margin: 4px 24px 0;
-    height: 170px;
     border-radius: 12px;
     background: var(--card-alt);
     overflow: hidden;
   }
   .inspection-illustration img {
+    /* natural aspect ratio — never crop the illustration */
     width: 100%;
-    height: 100%;
-    object-fit: cover;
+    height: auto;
     display: block;
   }
 
@@ -533,7 +532,7 @@
     section, .intro { padding-left: 56px; padding-right: 56px; }
     .submit-wrap, .footnote { padding-left: 56px; padding-right: 56px; }
     .header { padding: 56px 56px 24px; }
-    .inspection-illustration { margin: 4px 56px 0; height: 220px; }
+    .inspection-illustration { margin: 4px 56px 0; }
     .deadline-card { margin: 18px 56px 0; }
     .order-grid { grid-template-columns: 1fr 1fr; gap: 8px 20px; }
   }
