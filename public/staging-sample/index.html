@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Staging Sample</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%;
+    background: #f2ede3;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    -webkit-user-select: none; user-select: none;
+  }
+
+  /* ============ HOME ============ */
+  #home {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 48px;
+    transition: opacity .4s ease;
+  }
+  #home.hidden { opacity: 0; pointer-events: none; }
+  #home h1 {
+    color: #444; font-size: 20px; font-weight: 500;
+    letter-spacing: 6px; text-transform: uppercase;
+  }
+  #cards {
+    display: flex; gap: 24px; flex-wrap: wrap; justify-content: center;
+    padding: 0 24px;
+  }
+  .card {
+    width: 170px; height: 170px;
+    background: #faf7f0;
+    border: 1px solid #e4ddcd;
+    border-radius: 22px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 16px;
+    cursor: pointer;
+    transition: transform .25s ease, box-shadow .25s ease;
+  }
+  .card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 30px rgba(90, 80, 60, .12);
+  }
+  .card svg {
+    width: 44px; height: 44px;
+    stroke: #6b6353; stroke-width: 1.5;
+    fill: none; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .card .name {
+    color: #6b6353; font-size: 12px;
+    letter-spacing: 2px; text-transform: uppercase;
+  }
+
+  /* ============ VIEWER ============ */
+  #viewer {
+    position: fixed; inset: 0;
+    opacity: 0; pointer-events: none;
+    transition: opacity .4s ease;
+  }
+  #viewer.show { opacity: 1; pointer-events: auto; }
+  #stage {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    cursor: grab;
+  }
+  #stage.dragging { cursor: grabbing; }
+  canvas { max-width: 100%; max-height: 100%; display: block; }
+
+  #back {
+    position: absolute; top: 18px; left: 22px;
+    color: #6b6353; font-size: 12px; letter-spacing: 2px; text-transform: uppercase;
+    cursor: pointer; z-index: 5;
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; border-radius: 8px;
+    transition: background .2s ease;
+  }
+  #back:hover { background: rgba(0,0,0,.05); }
+  #roomTitle {
+    position: absolute; top: 24px; left: 50%; transform: translateX(-50%);
+    color: #9c9585; font-size: 11px; letter-spacing: 3px; text-transform: uppercase;
+  }
+  #deg {
+    position: absolute; top: 24px; right: 24px;
+    color: #9c9585; font-size: 11px; letter-spacing: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* loading / placeholder overlay inside viewer */
+  #overlay {
+    position: absolute; inset: 0;
+    background: #f2ede3;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 18px;
+    z-index: 4;
+    transition: opacity .5s ease;
+  }
+  #overlay.hidden { opacity: 0; pointer-events: none; }
+  #overlay .label {
+    color: #9c9585; font-size: 11px; letter-spacing: 3px; text-transform: uppercase;
+    text-align: center; line-height: 2;
+  }
+  #bar { width: 180px; height: 2px; background: #ddd6c7; border-radius: 1px; overflow: hidden; }
+  #bar .fill { width: 0%; height: 100%; background: #444; transition: width .15s ease; }
+  #bar.off { display: none; }
+
+  /* HUD */
+  #hud {
+    position: absolute; left: 0; right: 0; bottom: 22px;
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+    pointer-events: none;
+  }
+  #hint {
+    color: #9c9585; font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase;
+    transition: opacity .8s ease;
+  }
+  #hint.fade { opacity: 0; }
+  #scrub { width: 220px; height: 2px; background: #ddd6c7; border-radius: 1px; position: relative; }
+  #scrub .dot {
+    position: absolute; top: 50%; transform: translate(-50%, -50%);
+    width: 6px; height: 6px; border-radius: 50%; background: #444; left: 0%;
+  }
+  #variants { display: flex; gap: 14px; align-items: center; pointer-events: auto; }
+  .sw-dot {
+    width: 16px; height: 16px; border-radius: 50%;
+    cursor: pointer; border: 1px solid rgba(0,0,0,.15);
+    position: relative; transition: transform .2s ease;
+  }
+  .sw-dot:hover { transform: scale(1.15); }
+  .sw-dot::after {
+    content: ''; position: absolute; inset: -5px; border-radius: 50%;
+    border: 1px solid transparent; transition: border-color .2s ease;
+  }
+  .sw-dot.active::after { border-color: #7c7566; }
+  .sw-pill {
+    padding: 6px 14px; border-radius: 999px;
+    border: 1px solid #d5cdba;
+    color: #8a8272; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;
+    cursor: pointer; background: transparent;
+    transition: all .2s ease;
+  }
+  .sw-pill:hover { border-color: #a89f8a; }
+  .sw-pill.active { background: #444; border-color: #444; color: #f2ede3; }
+</style>
+</head>
+<body>
+
+  <!-- ============ HOME ============ -->
+  <div id="home">
+    <h1>Staging Sample</h1>
+    <div id="cards">
+      <div class="card" data-room="living">
+        <svg viewBox="0 0 24 24">
+          <path d="M4 11 V8 a2 2 0 0 1 2-2 h12 a2 2 0 0 1 2 2 v3"/>
+          <path d="M4 11 a2 2 0 0 0-2 2 v3 a2 2 0 0 0 2 2 h16 a2 2 0 0 0 2-2 v-3 a2 2 0 0 0-2-2 a2 2 0 0 0-2 2 v1 H6 v-1 a2 2 0 0 0-2-2 z"/>
+          <path d="M5 18 v1.5 M19 18 v1.5"/>
+        </svg>
+        <div class="name">Living Room</div>
+      </div>
+      <div class="card" data-room="kitchen">
+        <svg viewBox="0 0 24 24">
+          <path d="M5 3 v18 M5 8 h4 M9 3 v18"/>
+          <path d="M9 3 h11 v6 h-11"/>
+          <path d="M13 12 h6 a1 1 0 0 1 1 1 v7 a1 1 0 0 1-1 1 h-6 a1 1 0 0 1-1-1 v-7 a1 1 0 0 1 1-1 z M12 15 h8"/>
+        </svg>
+        <div class="name">Kitchen &amp; Dining</div>
+      </div>
+      <div class="card" data-room="bedroom">
+        <svg viewBox="0 0 24 24">
+          <path d="M3 18 v-8 a2 2 0 0 1 2-2 h14 a2 2 0 0 1 2 2 v8"/>
+          <path d="M3 18 h18 M3 18 v2 M21 18 v2"/>
+          <path d="M6 8 V6 a1 1 0 0 1 1-1 h10 a1 1 0 0 1 1 1 v2"/>
+          <path d="M6 12 h5 M13 12 h5"/>
+        </svg>
+        <div class="name">Bedroom</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ VIEWER ============ -->
+  <div id="viewer">
+    <div id="stage"><canvas id="cv"></canvas></div>
+    <div id="back">&#8592; Back</div>
+    <div id="roomTitle"></div>
+    <div id="deg"></div>
+    <div id="overlay">
+      <div class="label" id="ovLabel">Loading</div>
+      <div id="bar"><div class="fill"></div></div>
+    </div>
+    <div id="hud">
+      <div id="scrub"><div class="dot"></div></div>
+      <div id="variants"></div>
+      <div id="hint">Drag to rotate</div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  var FRAME_COUNT = 31;
+  var PX_PER_FRAME = 12;      // 拖动灵敏度：每 12px 走一帧
+  var TOTAL_DEG = 90;
+
+  function pad(n, w) { return String(n).padStart(w, '0'); }
+
+  // ---- 房间配置 ----
+  var ROOMS = {
+    living: {
+      name: 'Living Room',
+      variants: [
+        { key: 'ws', dot: '#efe9dc', title: '米白沙发', file: function (i) { return 'WS/ws' + pad(i, 2) + '.webp'; } },
+        { key: 'rs', dot: '#722f37', title: '酒红沙发', file: function (i) { return 'WS/RS/rs' + pad(i, 4) + '.webp'; } }
+      ]
+    },
+    kitchen: {
+      name: 'Kitchen & Dining',
+      variants: [
+        { key: 'ki', label: 'Island',    file: function (i) { return 'KI/ki' + pad(i, 4) + '.webp'; } },
+        { key: 'kn', label: 'No Island', file: function (i) { return 'KitchenNI/kn' + pad(i, 4) + '.webp'; } }
+      ]
+    },
+    bedroom: {
+      name: 'Bedroom',
+      variants: [
+        { key: 'br', file: function (i) { return 'bedroom/br' + pad(i, 4) + '.webp'; } }
+      ]
+    }
+  };
+
+  var home    = document.getElementById('home');
+  var viewer  = document.getElementById('viewer');
+  var stage   = document.getElementById('stage');
+  var canvas  = document.getElementById('cv');
+  var ctx     = canvas.getContext('2d');
+  var overlay = document.getElementById('overlay');
+  var ovLabel = document.getElementById('ovLabel');
+  var bar     = document.getElementById('bar');
+  var fill    = document.querySelector('#bar .fill');
+  var hint    = document.getElementById('hint');
+  var dot     = document.querySelector('#scrub .dot');
+  var degEl   = document.getElementById('deg');
+  var backBtn = document.getElementById('back');
+  var titleEl = document.getElementById('roomTitle');
+  var varBox  = document.getElementById('variants');
+
+  var cache = {};          // cache[room][variantKey] = [Image|null]
+  var currentRoom = null;
+  var activeVariant = null;
+  var pos = 0, target = 0, shownFrame = -1;
+  var interacted = false;
+  var loadToken = 0;       // 防止快速进出房间时旧的加载回调串台
+
+  // ---------- 视图切换 ----------
+  function goHome() {
+    currentRoom = null;
+    viewer.classList.remove('show');
+    home.classList.remove('hidden');
+  }
+
+  function enterRoom(room) {
+    currentRoom = room;
+    pos = 0; target = 0; shownFrame = -1;
+    activeVariant = ROOMS[room].variants[0].key;
+    titleEl.textContent = ROOMS[room].name;
+    degEl.textContent = '';
+    buildVariantButtons(room);
+    home.classList.add('hidden');
+    viewer.classList.add('show');
+
+    if (cache[room] && cache[room]._ready) {
+      overlay.classList.add('hidden');
+      fitAndDraw();
+    } else {
+      delete cache[room];   // 上次没加载完/失败 → 重新加载（渲染可能已完成）
+      loadRoom(room);
+    }
+  }
+
+  backBtn.addEventListener('click', goHome);
+  window.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && currentRoom) goHome();
+  });
+
+  document.querySelectorAll('.card').forEach(function (card) {
+    card.addEventListener('click', function () {
+      enterRoom(card.getAttribute('data-room'));
+    });
+  });
+
+  // ---------- 加载 ----------
+  function loadRoom(room) {
+    var token = ++loadToken;
+    var cfg = ROOMS[room];
+    var store = cache[room] = {};
+    overlay.classList.remove('hidden');
+    ovLabel.textContent = 'Loading';
+    bar.classList.remove('off');
+    fill.style.width = '0%';
+
+    var total = cfg.variants.length * FRAME_COUNT;
+    var settled = 0;
+
+    cfg.variants.forEach(function (v) {
+      store[v.key] = new Array(FRAME_COUNT);
+      for (var i = 0; i < FRAME_COUNT; i++) {
+        (function (v, i) {
+          var img = new Image();
+          img.onload = img.onerror = function () {
+            store[v.key][i] = (img.complete && img.naturalWidth) ? img : null;
+            settled++;
+            if (token !== loadToken) return;   // 已切走，静默继续存 cache
+            fill.style.width = Math.round(settled / total * 100) + '%';
+            if (settled === total) finishLoad(room, token);
+          };
+          img.src = v.file(i);
+        })(v, i);
+      }
+    });
+  }
+
+  function finishLoad(room, token) {
+    var store = cache[room];
+    // 首选 variant 必须 31 帧齐全才算可用
+    var primary = ROOMS[room].variants[0].key;
+    var ok = store[primary].every(function (f) { return f; });
+    if (ok) {
+      store._ready = true;
+      if (token === loadToken && currentRoom === room) {
+        overlay.classList.add('hidden');
+        fitAndDraw();
+      }
+    } else {
+      // 帧不齐（比如 bedroom 还在渲染）→ 显示占位，下次进入重新尝试
+      delete cache[room];
+      if (token === loadToken && currentRoom === room) showPlaceholder(room);
+    }
+  }
+
+  function showPlaceholder(room) {
+    overlay.classList.remove('hidden');
+    bar.classList.add('off');
+    ovLabel.innerHTML = ROOMS[room].name.toUpperCase() +
+      '<br>Rendering in progress &mdash; coming soon';
+  }
+
+  // ---------- 绘制 ----------
+  function currentFrames() {
+    var store = cache[currentRoom];
+    return store ? store[activeVariant] : null;
+  }
+
+  function fitCanvas(img) {
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var scale = Math.min(vw / img.width, vh / img.height);
+    var w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+  }
+
+  function draw(i) {
+    var frames = currentFrames();
+    if (!frames || !frames[i]) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(frames[i], 0, 0, canvas.width, canvas.height);
+    shownFrame = i;
+    var t = i / (FRAME_COUNT - 1);
+    dot.style.left = (t * 100) + '%';
+    degEl.textContent = (t * TOTAL_DEG).toFixed(1) + '°';
+  }
+
+  function fitAndDraw() {
+    var frames = currentFrames();
+    if (!frames) return;
+    var first = frames.find(function (f) { return f; });
+    if (!first) return;
+    fitCanvas(first);
+    shownFrame = -1;
+    draw(Math.round(pos));
+  }
+
+  window.addEventListener('resize', function () {
+    if (currentRoom && cache[currentRoom] && cache[currentRoom]._ready) fitAndDraw();
+  });
+
+  // 平滑逼近目标帧（惯性渲染感）
+  function tick() {
+    pos += (target - pos) * 0.35;
+    if (Math.abs(target - pos) < 0.01) pos = target;
+    var f = Math.max(0, Math.min(FRAME_COUNT - 1, Math.round(pos)));
+    if (f !== shownFrame) draw(f);
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  // ---------- variant 按钮 ----------
+  function buildVariantButtons(room) {
+    varBox.innerHTML = '';
+    var vs = ROOMS[room].variants;
+    if (vs.length < 2) return;   // 单一版本不显示切换
+    vs.forEach(function (v, idx) {
+      var el = document.createElement('div');
+      if (v.dot) {
+        el.className = 'sw-dot' + (idx === 0 ? ' active' : '');
+        el.style.background = v.dot;
+        if (v.title) el.title = v.title;
+      } else {
+        el.className = 'sw-pill' + (idx === 0 ? ' active' : '');
+        el.textContent = v.label;
+      }
+      el.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (activeVariant === v.key) return;
+        activeVariant = v.key;
+        Array.prototype.forEach.call(varBox.children, function (c, j) {
+          c.classList.toggle('active', j === idx);
+        });
+        var f = shownFrame < 0 ? 0 : shownFrame;
+        shownFrame = -1;
+        draw(f);   // 同角度瞬间切换
+      });
+      el.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+      varBox.appendChild(el);
+    });
+  }
+
+  // ---------- 拖动交互 ----------
+  var dragging = false, startX = 0, startPos = 0;
+
+  stage.addEventListener('pointerdown', function (e) {
+    dragging = true;
+    startX = e.clientX;
+    startPos = target;
+    stage.classList.add('dragging');
+    stage.setPointerCapture(e.pointerId);
+    if (!interacted) { interacted = true; hint.classList.add('fade'); }
+  });
+
+  stage.addEventListener('pointermove', function (e) {
+    if (!dragging) return;
+    var dx = e.clientX - startX;
+    // 往右拖 → 去 00；往左拖 → 去 30
+    target = Math.max(0, Math.min(FRAME_COUNT - 1, startPos - dx / PX_PER_FRAME));
+  });
+
+  function endDrag() {
+    dragging = false;
+    stage.classList.remove('dragging');
+    target = Math.max(0, Math.min(FRAME_COUNT - 1, Math.round(target)));
+  }
+  stage.addEventListener('pointerup', endDrag);
+  stage.addEventListener('pointercancel', endDrag);
+
+  window.addEventListener('keydown', function (e) {
+    if (!currentRoom) return;
+    if (e.key === 'ArrowLeft')  target = Math.min(FRAME_COUNT - 1, Math.round(target) + 1);
+    if (e.key === 'ArrowRight') target = Math.max(0, Math.round(target) - 1);
+  });
+})();
+</script>
+</body>
+</html>
