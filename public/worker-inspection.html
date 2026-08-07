@@ -926,35 +926,26 @@
 /* =========================================================
    Order binding — how the worker lands on the right order:
    In the admin portal, each order has a "Create worker link"
-   button. The backend generates a one-time token bound to
-   that order (e.g. .../worker-inspection.html?token=abc123),
-   the admin copies the link and sends it to the worker.
-   Everything submitted from this page is attached to that
-   order via the token — the worker never picks an order.
+   button (POST /api/admin/inspection-link) that mints a signed,
+   expiring token bound to that order. The admin copies the link
+   and sends it to the crew. Everything captured here is uploaded
+   to the order's folder in the private "inspections" bucket.
    ========================================================= */
 const WORKER_TOKEN = new URLSearchParams(location.search).get('token');
+// Opening the file directly (no server) falls back to demo data so the
+// flow can still be design-reviewed offline.
+const DEMO_MODE = !WORKER_TOKEN && location.protocol === 'file:';
 
-async function loadOrderFromServer(token) {
-  // TODO BACKEND:
-  // GET /api/worker-inspection/{token}
-  //   -> { orderId, deliveryAddress, deliveryDate, sets: [...] }
-  // Invalid/expired token -> show a plain-language error page.
-  console.log('loadOrderFromServer token =', token);
-  return null; // no backend yet — fall back to mock data below
-}
+let ROOMO_ORDER = { orderId: "", deliveryAddress: "", deliveryDate: "", sets: [] };
 
-/* =========================================================
-   Mock order data — replaced by backend in production.
-   ========================================================= */
-const ROOMO_ORDER = {
+const DEMO_ORDER = {
   orderId: "RM-10482",
-  customerName: "Jane Doe",
   deliveryAddress: "123 Example Street, Brooklyn, NY",
   deliveryDate: "August 10, 2026",
   sets: [
     { id: "living",  name: "Living Room Set", items: ["Sofa", "Rug", "Coffee Table", "Floor Lamp"] },
     { id: "dining",  name: "Dining Set",      items: ["Dining Table", "Dining Chairs"] },
-    { id: "bedroom", name: "Bedroom Set",     items: ["Bed Frame", "Mattress", "Nightstand"] }
+    { id: "bedding", name: "Bedroom Set",     items: ["Bed Frame", "Mattress", "Nightstand"] }
   ]
 };
 
@@ -966,11 +957,71 @@ const state = {
   currentSetId: null,
   pendingPhoto: null,   // { blob, url } — captured but not yet confirmed
   pendingVideo: null,   // { blob, url }
-  sets: {}              // id -> { photoBlob, photoUrl, videoBlob, videoUrl, status }
+  sets: {}              // id -> { photoBlob, photoUrl, photoPath, photoUpload, videoBlob, videoUrl, videoPath, videoUpload, status }
 };
-ROOMO_ORDER.sets.forEach(s => {
-  state.sets[s.id] = { photoBlob: null, photoUrl: null, videoBlob: null, videoUrl: null, status: "not_started" };
-});
+function initStateSets() {
+  state.sets = {};
+  ROOMO_ORDER.sets.forEach(s => {
+    state.sets[s.id] = {
+      photoBlob: null, photoUrl: null, photoPath: null, photoUpload: null,
+      videoBlob: null, videoUrl: null, videoPath: null, videoUpload: null,
+      status: "not_started"
+    };
+  });
+}
+
+/* =========================================================
+   Boot: load the order for this token
+   ========================================================= */
+async function init() {
+  if (DEMO_MODE) {
+    ROOMO_ORDER = DEMO_ORDER;
+    initStateSets();
+    renderHome();
+    return;
+  }
+  if (!WORKER_TOKEN) {
+    showFatal("This link is missing its access code. Ask the Roomo team to send you a new one.");
+    return;
+  }
+  try {
+    const r = await fetch('/api/inspection/order?token=' + encodeURIComponent(WORKER_TOKEN));
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Could not load this order.');
+    ROOMO_ORDER = {
+      orderId: d.orderShort,
+      deliveryAddress: d.deliveryAddress,
+      deliveryDate: d.deliveryDate + (d.deliverySlot ? ' · ' + d.deliverySlot : ''),
+      sets: d.sets
+    };
+    initStateSets();
+    // Hydrate media the crew already uploaded (e.g. link reopened)
+    const media = (d.inspection && d.inspection.media) || {};
+    for (const [setId, m] of Object.entries(media)) {
+      const st = state.sets[setId];
+      if (!st) continue;
+      if (m.photoUrl) { st.photoUrl = m.photoUrl; st.photoPath = m.photo; }
+      if (m.videoUrl) { st.videoUrl = m.videoUrl; st.videoPath = m.video; }
+      if (st.photoPath && st.videoPath) st.status = "completed";
+    }
+    renderHome();
+  } catch (e) {
+    console.log('order load failed', e);
+    showFatal("This link isn't valid anymore, or the order couldn't be loaded. Ask the Roomo team to send you a new link.");
+  }
+}
+
+function showFatal(msg) {
+  const home = document.getElementById('screen-home');
+  home.innerHTML = `
+    <div class="home-header"><div class="logo">ROOMO</div><div class="kicker">Virtual Inspection</div></div>
+    <div class="error-panel" style="display:flex;">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#865651" stroke-width="1.6"><circle cx="12" cy="12" r="10"/><path d="M12 8v5"/><circle cx="12" cy="16.5" r=".5" fill="#865651"/></svg>
+      <h3>We couldn't open this inspection</h3>
+      <p>${msg}</p>
+    </div>`;
+  showScreen('screen-home');
+}
 
 let cameraStream = null;
 let mediaRecorder = null;
@@ -981,24 +1032,42 @@ let leaveContext = null;   // which step the leave-modal refers to
 let submitting = false;
 
 /* =========================================================
-   Backend hooks — all future server logic lives here.
+   Server plumbing — media goes straight to the private
+   "inspections" storage bucket via signed upload URLs.
    ========================================================= */
-async function uploadInspectionMedia(setId, mediaType, fileOrBlob) {
-  // TODO BACKEND: upload photo/video for a set
-  console.log('uploadInspectionMedia', setId, mediaType, fileOrBlob);
+async function uploadInspectionMedia(setId, mediaType, blob) {
+  if (DEMO_MODE) return 'demo/' + setId + '-' + mediaType;
+  const r = await fetch('/api/inspection/upload-url', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      token: WORKER_TOKEN,
+      setType: setId,
+      mediaType,
+      contentType: blob.type || (mediaType === 'photo' ? 'image/jpeg' : 'video/webm')
+    })
+  });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error || 'Upload failed');
+  const put = await fetch(d.signedUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': blob.type || 'application/octet-stream' },
+    body: blob
+  });
+  if (!put.ok) throw new Error('Upload failed (' + put.status + ')');
+  return d.path;
 }
-async function saveSetCompletion(setId) {
-  // TODO BACKEND: persist set completion state
-  console.log('saveSetCompletion', setId);
-}
-async function submitInspectionToServer(payload) {
-  // TODO BACKEND:
-  // 1. Upload confirmed photos
-  // 2. Upload confirmed videos
-  // 3. Save set completion states
-  // 4. Create customer inspection link
-  console.log('submitInspection payload', payload);
-  await new Promise(r => setTimeout(r, 900)); // simulated latency
+
+// Upload in the background the moment the worker confirms a photo/video,
+// so "Submit inspection" at the end is nearly instant.
+function queueUpload(setId, mediaType) {
+  const st = state.sets[setId];
+  const blob = mediaType === 'photo' ? st.photoBlob : st.videoBlob;
+  if (!blob) return;
+  const key = mediaType + 'Upload';
+  st[key] = uploadInspectionMedia(setId, mediaType, blob)
+    .then(path => { st[mediaType + 'Path'] = path; st[key] = null; return path; })
+    .catch(err => { console.log('background upload failed, will retry at submit', err); st[key] = null; });
 }
 
 /* =========================================================
@@ -1216,11 +1285,12 @@ function discardPendingPhoto() {
 
 function usePhoto() {
   const st = state.sets[state.currentSetId];
-  if (st.photoUrl) URL.revokeObjectURL(st.photoUrl);
+  if (st.photoUrl && st.photoUrl.startsWith('blob:')) URL.revokeObjectURL(st.photoUrl);
   st.photoBlob = state.pendingPhoto.blob;
   st.photoUrl = state.pendingPhoto.url;
+  st.photoPath = null;
   state.pendingPhoto = null;
-  uploadInspectionMedia(state.currentSetId, 'photo', st.photoBlob); // TODO BACKEND (stub)
+  queueUpload(state.currentSetId, 'photo'); // background upload to storage
   goVideoIntro();
 }
 
@@ -1401,13 +1471,13 @@ function discardPendingVideo() {
 
 function useVideo() {
   const st = state.sets[state.currentSetId];
-  if (st.videoUrl) URL.revokeObjectURL(st.videoUrl);
+  if (st.videoUrl && st.videoUrl.startsWith('blob:')) URL.revokeObjectURL(st.videoUrl);
   st.videoBlob = state.pendingVideo.blob;
   st.videoUrl = state.pendingVideo.url;
+  st.videoPath = null;
   state.pendingVideo = null;
   st.status = 'completed';
-  uploadInspectionMedia(state.currentSetId, 'video', st.videoBlob); // TODO BACKEND (stub)
-  saveSetCompletion(state.currentSetId);                            // TODO BACKEND (stub)
+  queueUpload(state.currentSetId, 'video'); // background upload to storage
   showSetComplete();
 }
 
@@ -1515,20 +1585,35 @@ async function submitInspection() {
   btn.disabled = true;
   btn.textContent = 'Submitting inspection…';
 
-  const payload = {
-    token: WORKER_TOKEN,          // binds this submission to the order
-    orderId: ROOMO_ORDER.orderId,
-    submittedAt: new Date().toISOString(),
-    sets: ROOMO_ORDER.sets.map(meta => ({
-      id: meta.id,
-      name: meta.name,
-      status: state.sets[meta.id].status
-      // blobs are uploaded via uploadInspectionMedia()
-    }))
-  };
-
   try {
-    await submitInspectionToServer(payload);
+    if (DEMO_MODE) {
+      await new Promise(r => setTimeout(r, 900));
+    } else {
+      // Wait for background uploads; retry anything that failed.
+      for (const meta of ROOMO_ORDER.sets) {
+        const st = state.sets[meta.id];
+        for (const mt of ['photo', 'video']) {
+          if (st[mt + 'Upload']) await st[mt + 'Upload'];
+          if (!st[mt + 'Path']) {
+            const blob = mt === 'photo' ? st.photoBlob : st.videoBlob;
+            if (!blob) throw new Error('Missing ' + mt + ' for ' + meta.name + '. Please redo that set.');
+            st[mt + 'Path'] = await uploadInspectionMedia(meta.id, mt, blob);
+          }
+        }
+      }
+      const setsPayload = {};
+      ROOMO_ORDER.sets.forEach(meta => {
+        const st = state.sets[meta.id];
+        setsPayload[meta.id] = { photo: st.photoPath, video: st.videoPath };
+      });
+      const r = await fetch('/api/inspection/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: WORKER_TOKEN, sets: setsPayload })
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Submit failed');
+    }
     showScreen('screen-success');
   } catch (err) {
     submitting = false;
@@ -1543,14 +1628,16 @@ async function submitInspection() {
       bar.style.cssText = 'margin:14px 0 0;padding:12px 14px;border:1px solid #C9A9A5;background:#F4E9E7;border-radius:8px;font-size:12.5px;color:#865651;line-height:1.45;';
       list.appendChild(bar);
     }
-    bar.textContent = "We couldn't submit the inspection. Check your connection and try again.";
+    bar.textContent = (err && err.message && !/failed to fetch/i.test(err.message))
+      ? err.message
+      : "We couldn't submit the inspection. Check your connection and try again.";
   }
 }
 
 /* =========================================================
    Init
    ========================================================= */
-renderHome();
+init();
 </script>
 
 </body>

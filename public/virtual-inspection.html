@@ -647,9 +647,16 @@
 
 <script>
   /* =========================================================
-     Mock data — replaced by backend-rendered values in prod.
+     Access — the customer arrives via the signed link in their
+     inspection email (?token=...). The token is minted by
+     /api/admin/send-inspection and scoped to this one order.
+     Opening the file directly (no server) shows demo data so
+     the page can be design-reviewed offline.
      ========================================================= */
-  const ROOMO_INSPECTION = {
+  const CUSTOMER_TOKEN = new URLSearchParams(location.search).get('token');
+  const DEMO_MODE = !CUSTOMER_TOKEN && location.protocol === 'file:';
+
+  let ROOMO_INSPECTION = {
     orderId: "RM-10482",
     customerName: "Jane Doe",
     deliveryAddress: "123 Example Street, Brooklyn, NY",
@@ -665,15 +672,68 @@
     ]
   };
 
-  /* ---------- render header/order info ---------- */
-  document.getElementById('deadlineText').textContent = ROOMO_INSPECTION.inspectionDeadline;
-  document.getElementById('orderIdText').textContent = ROOMO_INSPECTION.orderId;
-  document.getElementById('custNameText').textContent = ROOMO_INSPECTION.customerName;
-  document.getElementById('addressText').textContent = ROOMO_INSPECTION.deliveryAddress;
-  document.getElementById('deliveryDateText').textContent = ROOMO_INSPECTION.deliveryDate;
-  document.getElementById('termsLink').href = ROOMO_INSPECTION.rentalTermsUrl;
-  document.getElementById('successDeadline').textContent = ROOMO_INSPECTION.inspectionDeadline;
-  document.getElementById('printedName').value = ROOMO_INSPECTION.customerName;
+  /* ---------- load order + media, then render ---------- */
+  async function init() {
+    if (!DEMO_MODE) {
+      if (!CUSTOMER_TOKEN) {
+        showFatal('This link is missing its access code. Please open the link from your Roomo email, or contact us at hello@roomonyc.com.');
+        return;
+      }
+      try {
+        const r = await fetch('/api/inspection/order?token=' + encodeURIComponent(CUSTOMER_TOKEN));
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Could not load your inspection.');
+        const media = (d.inspection && d.inspection.media) || {};
+        ROOMO_INSPECTION = {
+          orderId: d.orderShort,
+          customerName: d.customerName || '',
+          deliveryAddress: d.deliveryAddress,
+          deliveryDate: d.deliveryDate,
+          inspectionDeadline: d.inspectionDeadline || '48 hours after your delivery',
+          rentalTermsUrl: 'https://www.roomonyc.com/rental-contract',
+          supportUrl: 'mailto:hello@roomonyc.com?subject=' + encodeURIComponent('Issue with order #' + d.orderShort),
+          illustrationUrl: '',
+          sets: (d.sets || []).map(s => ({
+            id: s.id,
+            name: s.name,
+            photoUrl: (media[s.id] && media[s.id].photoUrl) || '',
+            videoUrl: (media[s.id] && media[s.id].videoUrl) || '',
+            videoPoster: '',
+            videoDuration: '0:07'
+          }))
+        };
+      } catch (e) {
+        console.log('inspection load failed', e);
+        showFatal("This link isn't valid anymore, or your inspection couldn't be loaded. Please contact us at hello@roomonyc.com and we'll sort it out.");
+        return;
+      }
+    }
+    renderAll();
+  }
+
+  function showFatal(msg) {
+    const body = document.getElementById('formBody');
+    body.innerHTML = `
+      <div class="header"><div class="logo">ROOMO</div><div class="kicker">Virtual Inspection</div></div>
+      <div style="text-align:center; padding: 40px 32px 80px;">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#865651" stroke-width="1.5" style="margin:0 auto 16px; display:block;"><circle cx="12" cy="12" r="10"/><path d="M12 8v5"/><circle cx="12" cy="16.5" r=".5" fill="#865651"/></svg>
+        <h2 style="font-family:'Manrope',sans-serif; font-size:17px; font-weight:700; color:var(--brown-dark); margin:0 0 10px;">We couldn't open your inspection</h2>
+        <p style="font-size:13.5px; color:var(--text-body); line-height:1.55; margin:0; max-width:420px; margin-left:auto; margin-right:auto;">${msg}</p>
+      </div>`;
+  }
+
+  function renderAll() {
+    document.getElementById('deadlineText').textContent = ROOMO_INSPECTION.inspectionDeadline;
+    document.getElementById('orderIdText').textContent = ROOMO_INSPECTION.orderId;
+    document.getElementById('custNameText').textContent = ROOMO_INSPECTION.customerName;
+    document.getElementById('addressText').textContent = ROOMO_INSPECTION.deliveryAddress;
+    document.getElementById('deliveryDateText').textContent = ROOMO_INSPECTION.deliveryDate;
+    document.getElementById('termsLink').href = ROOMO_INSPECTION.rentalTermsUrl;
+    document.getElementById('successDeadline').textContent = ROOMO_INSPECTION.inspectionDeadline;
+    document.getElementById('printedName').value = ROOMO_INSPECTION.customerName;
+    renderSets();
+    checkFormValid();
+  }
 
   /* ---------- render sets ---------- */
   const PLACEHOLDER_PHOTO_SVG = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A89595" stroke-width="1.5"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8" cy="9" r="1.3"/><path d="M4 16l4.586-4.586a2 2 0 0 1 2.828 0L16 16"/></svg>';
@@ -718,7 +778,6 @@
       container.appendChild(card);
     });
   }
-  renderSets();
 
   function mediaLoadError(imgEl) {
     const wrap = imgEl.parentElement;
@@ -895,15 +954,21 @@
     };
 
     try {
-      // TODO BACKEND:
-      // 1. Save agreement checkbox state
-      // 2. Save printed name
-      // 3. Save signature image
-      // 4. Save confirmation timestamp
-      // 5. Save order ID
-      // 6. Preserve the backend-provided 48-hour deadline
-      console.log('submitCustomerReceipt payload', payload);
-      await new Promise(r => setTimeout(r, 600)); // simulated latency
+      if (DEMO_MODE) {
+        await new Promise(r => setTimeout(r, 600)); // simulated latency
+      } else {
+        const r = await fetch('/api/inspection/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token: CUSTOMER_TOKEN,
+            printedName: payload.customerName,
+            signatureDataUrl: payload.signatureDataUrl
+          })
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Submit failed');
+      }
 
       document.getElementById('formBody').classList.add('hide');
       document.getElementById('successState').classList.add('show');
@@ -927,6 +992,9 @@
     }
     bar.textContent = msg;
   }
+
+  /* ---------- boot ---------- */
+  init();
 </script>
 
 </body>

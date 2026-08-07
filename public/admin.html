@@ -1642,42 +1642,59 @@ async function captureOrder(orderId) {
 
 // ─── Virtual inspection: worker link + customer email ───
 
-// Build the worker inspection link for this order and copy it to the
+// Mint a signed worker inspection link for this order and copy it to the
 // clipboard. Send it manually (text/WhatsApp) to whichever crew is doing
 // this delivery — everything they shoot attaches to this order.
-function createWorkerLink(orderId, btn) {
-  // TODO BACKEND: replace the raw order id with a signed, expiring token
-  // (same pattern as signPortalToken in lib/authToken.js) so the link
-  // can't be guessed. For now the link carries the order id directly.
-  var link = window.location.origin + '/worker-inspection.html?token=' + encodeURIComponent(orderId);
-  function copied() {
-    if (btn) {
-      var t = btn.textContent;
-      btn.textContent = 'Link copied ✓';
-      btn.disabled = true;
-      setTimeout(function(){ btn.textContent = t; btn.disabled = false; }, 2000);
+async function createWorkerLink(orderId, btn) {
+  var orig = btn ? btn.textContent : '';
+  if (btn) { btn.textContent = '...'; btn.disabled = true; }
+  try {
+    var r = await fetch('/api/admin/inspection-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getPassword() },
+      body: JSON.stringify({ orderId: orderId, role: 'worker' })
+    });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Failed to create link');
+    var link = d.url;
+    function copied() {
+      if (btn) {
+        btn.textContent = 'Link copied ✓';
+        setTimeout(function(){ btn.textContent = orig; btn.disabled = false; }, 2000);
+      }
     }
-  }
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(link).then(copied, function(){ prompt('Copy the worker link:', link); });
-  } else {
-    prompt('Copy the worker link:', link);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(link).then(copied, function(){
+        if (btn) { btn.textContent = orig; btn.disabled = false; }
+        prompt('Copy the worker link:', link);
+      });
+    } else {
+      if (btn) { btn.textContent = orig; btn.disabled = false; }
+      prompt('Copy the worker link:', link);
+    }
+  } catch (e) {
+    if (btn) { btn.textContent = orig; btn.disabled = false; }
+    alert('Could not create the worker link: ' + e.message);
   }
 }
 
 // Email the customer their virtual inspection form (remote deliveries only —
-// on-site customers sign the paper/on-site form with the worker present).
-async function sendInspection(orderId) {
+// on-site customers sign the on-site form with the worker present).
+async function sendInspection(orderId, force) {
   var o = ordersData.find(function(x){ return x.id === orderId; });
   var email = (o && o.customer) ? o.customer.email : '';
-  if (!confirm('Send the virtual inspection form to ' + (email || 'the customer') + '?\n\nMake sure the workers have finished this order\'s photos and videos first — the email links the customer straight to them.')) return;
+  if (!force && !confirm('Send the virtual inspection form to ' + (email || 'the customer') + '?\n\nMake sure the workers have finished this order\'s photos and videos first — the email links the customer straight to them.')) return;
   try {
     var r = await fetch('/api/admin/send-inspection', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getPassword() },
-      body: JSON.stringify({ orderId: orderId })
+      body: JSON.stringify({ orderId: orderId, force: !!force })
     });
     var d = await r.json();
+    if (r.status === 409 && d.needsForce) {
+      if (confirm(d.error + '\n\nSend the email anyway?')) return sendInspection(orderId, true);
+      return;
+    }
     if (!r.ok) throw new Error(d.error || 'Send failed');
     alert('Inspection email sent to ' + (d.email || email) + '.');
   } catch (e) {
