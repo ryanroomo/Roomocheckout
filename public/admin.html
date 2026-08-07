@@ -1594,7 +1594,7 @@ function renderOrderActions(o) {
   if (['deposit_paid', 'authorized', 'delivered', 'active'].includes(o.status)) {
     btns += `<button onclick="createWorkerLink('${o.id}', this)" style="padding:8px 20px;border-radius:8px;border:1.5px solid var(--text-secondary);background:transparent;color:var(--text);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;margin-left:8px">Create worker link</button>`;
   }
-  if (['authorized', 'delivered', 'active'].includes(o.status)) {
+  if (['deposit_paid', 'authorized', 'delivered', 'active'].includes(o.status)) {
     btns += `<button onclick="sendInspection('${o.id}')" style="padding:8px 20px;border-radius:8px;border:none;background:#49372A;color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;margin-left:8px">Send inspection</button>`;
   }
   if (o.status === 'authorized') {
