@@ -1584,6 +1584,19 @@ function renderOrderActions(o) {
   const canRefund = !refunded && (o.status === 'deposit_paid' || o.status === 'cancelled');
 
   let btns = '';
+  // Virtual inspection (early-setup / remote deliveries):
+  // 1. "Create worker link" — copy a link bound to this order and send it to
+  //    the crew; everything they shoot attaches to this order automatically.
+  // 2. "Send inspection" — after reviewing the crew's photos/videos, email the
+  //    customer their virtual inspection form to review and sign.
+  // On-site deliveries need neither: the worker hands the customer the
+  // on-site confirmation form directly.
+  if (['deposit_paid', 'authorized', 'delivered', 'active'].includes(o.status)) {
+    btns += `<button onclick="createWorkerLink('${o.id}', this)" style="padding:8px 20px;border-radius:8px;border:1.5px solid var(--text-secondary);background:transparent;color:var(--text);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;margin-left:8px">Create worker link</button>`;
+  }
+  if (['authorized', 'delivered', 'active'].includes(o.status)) {
+    btns += `<button onclick="sendInspection('${o.id}')" style="padding:8px 20px;border-radius:8px;border:none;background:#49372A;color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;margin-left:8px">Send inspection</button>`;
+  }
   if (o.status === 'authorized') {
     const amt = o.authorizedAmountCents != null ? formatCurrency(o.authorizedAmountCents) : '';
     btns += `<button onclick="captureOrder('${o.id}')" style="padding:8px 20px;border-radius:8px;border:none;background:#4A7C59;color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;margin-left:8px">Confirm delivery &amp; capture ${amt}</button>`;
@@ -1624,6 +1637,51 @@ async function captureOrder(orderId) {
     loadOrders(); loadDashboard();
   } catch (e) {
     alert('Capture failed: ' + e.message);
+  }
+}
+
+// ─── Virtual inspection: worker link + customer email ───
+
+// Build the worker inspection link for this order and copy it to the
+// clipboard. Send it manually (text/WhatsApp) to whichever crew is doing
+// this delivery — everything they shoot attaches to this order.
+function createWorkerLink(orderId, btn) {
+  // TODO BACKEND: replace the raw order id with a signed, expiring token
+  // (same pattern as signPortalToken in lib/authToken.js) so the link
+  // can't be guessed. For now the link carries the order id directly.
+  var link = window.location.origin + '/worker-inspection.html?token=' + encodeURIComponent(orderId);
+  function copied() {
+    if (btn) {
+      var t = btn.textContent;
+      btn.textContent = 'Link copied ✓';
+      btn.disabled = true;
+      setTimeout(function(){ btn.textContent = t; btn.disabled = false; }, 2000);
+    }
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(link).then(copied, function(){ prompt('Copy the worker link:', link); });
+  } else {
+    prompt('Copy the worker link:', link);
+  }
+}
+
+// Email the customer their virtual inspection form (remote deliveries only —
+// on-site customers sign the paper/on-site form with the worker present).
+async function sendInspection(orderId) {
+  var o = ordersData.find(function(x){ return x.id === orderId; });
+  var email = (o && o.customer) ? o.customer.email : '';
+  if (!confirm('Send the virtual inspection form to ' + (email || 'the customer') + '?\n\nMake sure the workers have finished this order\'s photos and videos first — the email links the customer straight to them.')) return;
+  try {
+    var r = await fetch('/api/admin/send-inspection', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getPassword() },
+      body: JSON.stringify({ orderId: orderId })
+    });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Send failed');
+    alert('Inspection email sent to ' + (d.email || email) + '.');
+  } catch (e) {
+    alert('Send failed: ' + e.message);
   }
 }
 

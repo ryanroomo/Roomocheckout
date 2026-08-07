@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>ROOMO — Virtual Inspection</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700&family=League+Spartan:wght@300;400;500;600&family=MuseoModerno:wght@500&display=swap');
+
+  :root {
+    --bg: #EDE8E2;
+    --card: #F9F5F1;
+    --card-alt: #F4F0EA;
+    --ink: #3D342F;
+    --brown-dark: #49372A;
+    --brown-accent: #865651;
+    --text-body: #816E68;
+    --text-muted: #A89595;
+    --border: #E5DDD6;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    font-family: 'League Spartan', -apple-system, sans-serif;
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+  body.modal-open { overflow: hidden; }
+
+  button:focus-visible, a:focus-visible, input:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid var(--brown-accent);
+    outline-offset: 2px;
+  }
+
+  .page {
+    background: var(--card);
+    min-height: 100vh;
+    max-width: 640px;
+    margin: 0 auto;
+  }
+
+  /* ---------- header ---------- */
+  .header {
+    text-align: center;
+    padding: 36px 24px 24px;
+  }
+  .logo {
+    font-family: 'MuseoModerno', Georgia, serif;
+    font-weight: 500;
+    font-size: 28px;
+    letter-spacing: 0.5px;
+    color: var(--brown-dark);
+  }
+  .header .kicker {
+    margin-top: 8px;
+    font-family: 'Manrope', sans-serif;
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  /* ---------- illustration placeholder ---------- */
+  .inspection-illustration {
+    margin: 4px 24px 0;
+    height: 170px;
+    border-radius: 12px;
+    background: var(--card-alt);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+  }
+
+  /* ---------- intro ---------- */
+  .intro {
+    padding: 24px 24px 26px;
+    text-align: center;
+  }
+  .intro h1 {
+    font-family: 'Manrope', sans-serif;
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--brown-dark);
+    margin: 0 0 10px;
+  }
+  .intro p {
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--text-body);
+    margin: 0;
+  }
+  .deadline-card {
+    margin: 18px 24px 0;
+    padding: 14px 16px;
+    background: var(--card-alt);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--ink);
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    text-align: left;
+  }
+  .deadline-card svg { flex-shrink: 0; margin-top: 1px; }
+  .deadline-card strong {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 600;
+    color: var(--brown-accent);
+  }
+
+  /* ---------- section shell ---------- */
+  section {
+    padding: 26px 24px;
+    border-top: 1px solid var(--border);
+  }
+  .section-label {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 700;
+    font-size: 10px;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--brown-accent);
+    margin: 0 0 16px;
+  }
+
+  /* ---------- compact order card ---------- */
+  .order-card {
+    background: var(--card-alt);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .order-card .order-id {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--ink);
+    margin: 0 0 10px;
+  }
+  .order-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .order-grid .row { font-size: 12.5px; color: var(--text-body); line-height: 1.45; }
+  .order-grid .row b {
+    font-weight: 500;
+    color: var(--ink);
+    font-family: 'Manrope', sans-serif;
+  }
+
+  /* ---------- inspection set cards ---------- */
+  .set-card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 14px;
+    background: var(--card);
+  }
+  .set-card:last-of-type { margin-bottom: 0; }
+  .set-card .set-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .set-card .set-name {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--ink);
+  }
+  .set-card .set-status {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+  .set-card .set-top .status-icon { margin-left: auto; flex-shrink: 0; }
+
+  .media-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .media-thumb {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: var(--card-alt);
+    cursor: pointer;
+    padding: 0;
+    display: block;
+    width: 100%;
+    transition: border-color .15s ease;
+  }
+  .media-thumb:hover { border-color: var(--brown-accent); }
+  .media-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .media-thumb .ph {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: var(--text-muted);
+    font-family: 'Manrope', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+  }
+  .media-thumb .tag {
+    position: absolute;
+    bottom: 6px;
+    left: 6px;
+    background: rgba(61,52,47,0.72);
+    color: #F9F5F1;
+    font-size: 9.5px;
+    font-family: 'Manrope', sans-serif;
+    font-weight: 500;
+    padding: 3px 8px;
+    border-radius: 20px;
+    pointer-events: none;
+  }
+  .media-thumb .duration {
+    position: absolute;
+    bottom: 6px;
+    right: 6px;
+    background: rgba(61,52,47,0.72);
+    color: #F9F5F1;
+    font-size: 9.5px;
+    font-family: 'Manrope', sans-serif;
+    padding: 3px 7px;
+    border-radius: 20px;
+    pointer-events: none;
+  }
+  .media-thumb .play-badge {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(61,52,47,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .media-error {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.45;
+    padding: 10px;
+    text-align: center;
+  }
+
+  /* ---------- report issue ---------- */
+  .report {
+    text-align: center;
+  }
+  .report h3 {
+    font-family: 'Manrope', sans-serif;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--ink);
+    margin: 0 0 6px;
+  }
+  .report p {
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text-body);
+    margin: 0 0 14px;
+  }
+  .btn-outline {
+    display: inline-block;
+    border: 1.5px solid var(--brown-dark);
+    background: transparent;
+    color: var(--brown-dark);
+    border-radius: 30px;
+    padding: 12px 28px;
+    min-height: 44px;
+    font-family: 'League Spartan', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background .15s ease;
+  }
+  .btn-outline:hover { background: var(--card-alt); }
+
+  /* ---------- statement ---------- */
+  .statement p {
+    margin: 0 0 12px;
+    font-size: 13.5px;
+    line-height: 1.45;
+    color: var(--text-body);
+  }
+  .statement .deadline { color: var(--brown-accent); font-weight: 500; }
+
+  .agree {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-top: 16px;
+    cursor: pointer;
+  }
+  .agree input {
+    margin-top: 2px;
+    width: 16px;
+    height: 16px;
+    accent-color: var(--brown-dark);
+    flex-shrink: 0;
+  }
+  .agree span { font-size: 12.5px; line-height: 1.5; color: var(--ink); }
+  .terms-link { color: var(--brown-accent); text-decoration: underline; }
+
+  /* ---------- signature ---------- */
+  .sig-wrap {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background-color: var(--card-alt);
+    position: relative;
+  }
+  canvas#sigPad {
+    width: 100%;
+    height: 150px;
+    display: block;
+    touch-action: none;
+    cursor: crosshair;
+  }
+  .sig-placeholder {
+    position: absolute;
+    top: 50%;
+    left: 16px;
+    transform: translateY(-50%);
+    font-size: 12px;
+    color: var(--text-muted);
+    pointer-events: none;
+    font-family: 'Manrope', sans-serif;
+  }
+  .sig-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+    min-height: 24px;
+  }
+  .sig-actions .hint { font-size: 11px; color: var(--text-muted); }
+  .sig-actions button {
+    border: none;
+    background: none;
+    font-family: 'League Spartan', sans-serif;
+    font-size: 12px;
+    color: var(--brown-accent);
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 8px 0 8px 12px;
+    visibility: hidden;
+  }
+  .sig-actions button.visible { visibility: visible; }
+
+  .name-field { margin-top: 16px; }
+  .name-field label {
+    display: block;
+    font-size: 11.5px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .name-field input {
+    width: 100%;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    background: transparent;
+    padding: 6px 2px;
+    font-family: 'Manrope', sans-serif;
+    font-size: 14px;
+    color: var(--ink);
+    outline: none;
+  }
+  .name-field input:focus { border-bottom-color: var(--brown-accent); }
+
+  /* ---------- submit ---------- */
+  .submit-wrap { padding: 28px 24px 44px; }
+  .submit-btn {
+    width: 100%;
+    min-height: 56px;
+    border: none;
+    border-radius: 36px;
+    background: var(--brown-dark);
+    color: #F9F5F1;
+    font-family: 'League Spartan', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 16px;
+    cursor: pointer;
+    transition: opacity .2s ease, transform .1s ease;
+  }
+  .submit-btn:disabled {
+    background: var(--text-muted);
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+  .submit-btn:not(:disabled):active { transform: scale(0.98); }
+
+  .footnote {
+    text-align: center;
+    padding: 0 24px 40px;
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.45;
+  }
+
+  /* ---------- success ---------- */
+  .success {
+    display: none;
+    text-align: center;
+    padding: 90px 32px;
+  }
+  .success.show { display: block; }
+  .success svg { margin: 0 auto 20px; display: block; }
+  .success h2 {
+    font-family: 'Manrope', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--brown-dark);
+    margin: 0 0 8px;
+  }
+  .success p {
+    font-size: 13px;
+    color: var(--text-body);
+    line-height: 1.5;
+    margin: 0 0 14px;
+  }
+  .success .success-deadline {
+    display: inline-block;
+    background: var(--card-alt);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 12.5px;
+    color: var(--ink);
+    line-height: 1.5;
+    margin-bottom: 18px;
+  }
+  .success a {
+    color: var(--brown-accent);
+    font-size: 12.5px;
+    text-decoration: underline;
+  }
+  .form-body.hide { display: none; }
+
+  /* ---------- modal ---------- */
+  .modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(61,52,47,0.88);
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .modal.show { display: flex; }
+  .modal .modal-inner {
+    position: relative;
+    width: 100%;
+    max-width: 860px;
+    max-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal img, .modal video {
+    max-width: 100%;
+    max-height: calc(100vh - 88px);
+    object-fit: contain;
+    border-radius: 10px;
+    display: block;
+    background: #000;
+  }
+  .modal .modal-close {
+    position: absolute;
+    top: -46px;
+    right: 0;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(249,245,241,0.16);
+    color: #F9F5F1;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal .modal-caption {
+    position: absolute;
+    bottom: -34px;
+    left: 0;
+    color: rgba(249,245,241,0.75);
+    font-size: 11.5px;
+    font-family: 'Manrope', sans-serif;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+  }
+
+  /* ---------- desktop ---------- */
+  @media (min-width: 640px) {
+    .page { box-shadow: 0 1px 3px rgba(61,52,47,0.05); }
+    section, .intro { padding-left: 56px; padding-right: 56px; }
+    .submit-wrap, .footnote { padding-left: 56px; padding-right: 56px; }
+    .header { padding: 56px 56px 24px; }
+    .inspection-illustration { margin: 4px 56px 0; height: 220px; }
+    .deadline-card { margin: 18px 56px 0; }
+    .order-grid { grid-template-columns: 1fr 1fr; gap: 8px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <div class="form-body" id="formBody">
+
+    <div class="header">
+      <div class="logo">ROOMO</div>
+      <div class="kicker">Virtual Inspection</div>
+    </div>
+
+    <div class="inspection-illustration" aria-hidden="true">
+      <!-- TODO: Add Roomo virtual inspection illustration here -->
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#A89595" stroke-width="1.4"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8" cy="9" r="1.3"/><path d="M4 16l4.586-4.586a2 2 0 0 1 2.828 0L16 16"/></svg>
+    </div>
+
+    <div class="intro">
+      <h1>Your virtual inspection is ready</h1>
+      <p>Our team photographed and recorded each furniture set after installation. Review the media below, then confirm your delivery.</p>
+    </div>
+
+    <div class="deadline-card">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#865651" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span>You have 48 hours to report any missing items, visible damage, or setup issues.<br><strong>Report issues by <span id="deadlineText"></span></strong></span>
+    </div>
+
+    <section style="border-top:none; padding-top:22px;">
+      <p class="section-label">Order Details</p>
+      <div class="order-card">
+        <p class="order-id">Order #<span id="orderIdText"></span></p>
+        <div class="order-grid">
+          <div class="row"><b id="custNameText"></b></div>
+          <div class="row" id="addressText"></div>
+          <div class="row">Delivered <b id="deliveryDateText"></b></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <p class="section-label">Furniture Sets</p>
+      <div id="setsContainer"></div>
+    </section>
+
+    <section class="report">
+      <h3>Something doesn't look right?</h3>
+      <p>Report a missing item, visible damage, or setup issue within 48 hours.</p>
+      <button type="button" class="btn-outline" onclick="reportIssue()">Report an issue</button>
+    </section>
+
+    <section class="statement">
+      <p class="section-label">Confirmation Statement</p>
+      <p>I've reviewed the virtual inspection media for my order. I understand that I have <span class="deadline">48 hours</span> after the applicable delivery or move-in time to report any missing items, visible damage, or setup issues. If I do not report an issue within that period, the order will be considered received in good condition under Roomo's rental terms.</p>
+
+      <label class="agree">
+        <input type="checkbox" id="agreeBox" onchange="checkFormValid()">
+        <span>I agree to the statement above and Roomo's <a id="termsLink" href="#" target="_blank" rel="noopener" class="terms-link">rental terms</a>.</span>
+      </label>
+    </section>
+
+    <section>
+      <p class="section-label">Signature</p>
+      <div class="sig-wrap">
+        <span class="sig-placeholder" id="sigPlaceholder">Sign here</span>
+        <canvas id="sigPad"></canvas>
+      </div>
+      <div class="sig-actions">
+        <span class="hint">Use your finger or mouse to sign</span>
+        <button type="button" id="clearSigBtn" onclick="clearSig()">Clear &amp; resign</button>
+      </div>
+
+      <div class="name-field">
+        <label for="printedName">Printed name</label>
+        <input type="text" id="printedName" placeholder="Jane Doe" oninput="checkFormValid()">
+      </div>
+    </section>
+
+    <div class="submit-wrap">
+      <button type="button" class="submit-btn" id="submitBtn" disabled onclick="submitCustomerReceipt()">Confirm Receipt</button>
+    </div>
+
+    <p class="footnote">Submission time and device information will be recorded as proof of receipt.</p>
+
+  </div>
+
+  <div class="success" id="successState">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#865651" stroke-width="1.5">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M8 12.5l2.5 2.5L16 9.5"/>
+    </svg>
+    <h2>Receipt confirmed</h2>
+    <p>Your confirmation has been recorded.</p>
+    <div class="success-deadline">You can report delivery or setup issues until <strong id="successDeadline"></strong>.</div>
+    <br>
+    <a href="#" id="successReportLink" onclick="reportIssue(); return false;">Report an issue</a>
+  </div>
+
+</div>
+
+<!-- media modal -->
+<div class="modal" id="mediaModal" role="dialog" aria-modal="true" aria-label="Inspection media viewer">
+  <div class="modal-inner">
+    <button type="button" class="modal-close" aria-label="Close viewer" onclick="closeModal()">&#10005;</button>
+    <div id="modalContent"></div>
+    <span class="modal-caption" id="modalCaption"></span>
+  </div>
+</div>
+
+<script>
+  /* =========================================================
+     Mock data — replaced by backend-rendered values in prod.
+     ========================================================= */
+  const ROOMO_INSPECTION = {
+    orderId: "RM-10482",
+    customerName: "Jane Doe",
+    deliveryAddress: "123 Example Street, Brooklyn, NY",
+    deliveryDate: "August 10, 2026",
+    inspectionDeadline: "August 12, 2026 at 5:00 PM", // provided by backend — do NOT compute client-side
+    rentalTermsUrl: "https://www.roomonyc.com/rental-contract",
+    supportUrl: "#",
+    illustrationUrl: "",
+    sets: [
+      { id: "living",  name: "Living Room Set", photoUrl: "", videoUrl: "", videoPoster: "", videoDuration: "0:07" },
+      { id: "dining",  name: "Dining Set",      photoUrl: "", videoUrl: "", videoPoster: "", videoDuration: "0:07" },
+      { id: "bedroom", name: "Bedroom Set",     photoUrl: "", videoUrl: "", videoPoster: "", videoDuration: "0:07" }
+    ]
+  };
+
+  /* ---------- render header/order info ---------- */
+  document.getElementById('deadlineText').textContent = ROOMO_INSPECTION.inspectionDeadline;
+  document.getElementById('orderIdText').textContent = ROOMO_INSPECTION.orderId;
+  document.getElementById('custNameText').textContent = ROOMO_INSPECTION.customerName;
+  document.getElementById('addressText').textContent = ROOMO_INSPECTION.deliveryAddress;
+  document.getElementById('deliveryDateText').textContent = ROOMO_INSPECTION.deliveryDate;
+  document.getElementById('termsLink').href = ROOMO_INSPECTION.rentalTermsUrl;
+  document.getElementById('successDeadline').textContent = ROOMO_INSPECTION.inspectionDeadline;
+  document.getElementById('printedName').value = ROOMO_INSPECTION.customerName;
+
+  /* ---------- render sets ---------- */
+  const PLACEHOLDER_PHOTO_SVG = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A89595" stroke-width="1.5"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8" cy="9" r="1.3"/><path d="M4 16l4.586-4.586a2 2 0 0 1 2.828 0L16 16"/></svg>';
+  const PLACEHOLDER_VIDEO_SVG = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A89595" stroke-width="1.5"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3"/></svg>';
+  const PLAY_BADGE = '<span class="play-badge"><svg width="16" height="16" viewBox="0 0 24 24" fill="#F9F5F1"><path d="M8 5.5v13l11-6.5z"/></svg></span>';
+  const CHECK_ICON = '<svg class="status-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#865651" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg>';
+
+  function renderSets() {
+    const container = document.getElementById('setsContainer');
+    container.innerHTML = '';
+    ROOMO_INSPECTION.sets.forEach(set => {
+      const card = document.createElement('div');
+      card.className = 'set-card';
+
+      const photoInner = set.photoUrl
+        ? `<img src="${set.photoUrl}" alt="${set.name} overview photo" onerror="mediaLoadError(this)">`
+        : `<span class="ph">${PLACEHOLDER_PHOTO_SVG}Photo</span>`;
+
+      const videoInner = (set.videoPoster
+        ? `<img src="${set.videoPoster}" alt="${set.name} walkthrough video" onerror="mediaLoadError(this)">`
+        : `<span class="ph"></span>`) + PLAY_BADGE;
+
+      card.innerHTML = `
+        <div class="set-top">
+          <div>
+            <div class="set-name">${set.name}</div>
+            <div class="set-status">Installation complete</div>
+          </div>
+          ${CHECK_ICON}
+        </div>
+        <div class="media-grid">
+          <button type="button" class="media-thumb" aria-label="View ${set.name} photo" onclick="openPhotoModal('${set.id}')">
+            ${photoInner}
+            <span class="tag">Photo</span>
+          </button>
+          <button type="button" class="media-thumb" aria-label="Play ${set.name} walkthrough video" onclick="openVideoModal('${set.id}')">
+            ${videoInner}
+            <span class="tag">Walkthrough</span>
+            <span class="duration">${set.videoDuration || '0:07'}</span>
+          </button>
+        </div>`;
+      container.appendChild(card);
+    });
+  }
+  renderSets();
+
+  function mediaLoadError(imgEl) {
+    const wrap = imgEl.parentElement;
+    imgEl.remove();
+    const msg = document.createElement('span');
+    msg.className = 'media-error';
+    msg.textContent = 'This media could not be loaded. Please contact Roomo support.';
+    wrap.prepend(msg);
+  }
+
+  /* ---------- modal ---------- */
+  const modal = document.getElementById('mediaModal');
+  const modalContent = document.getElementById('modalContent');
+  const modalCaption = document.getElementById('modalCaption');
+  let lastFocused = null;
+
+  function findSet(id) { return ROOMO_INSPECTION.sets.find(s => s.id === id); }
+
+  function openModal(html, caption) {
+    lastFocused = document.activeElement;
+    modalContent.innerHTML = html;
+    modalCaption.textContent = caption;
+    modal.classList.add('show');
+    document.body.classList.add('modal-open');
+    modal.querySelector('.modal-close').focus();
+  }
+
+  function openPhotoModal(setId) {
+    const set = findSet(setId);
+    if (!set) return;
+    if (!set.photoUrl) {
+      openModal('<div style="color:#F9F5F1;font-size:13px;padding:40px 20px;text-align:center;">Photo not available yet.<br>Please contact Roomo support if this seems wrong.</div>', set.name + ' — Photo');
+      return;
+    }
+    openModal(`<img src="${set.photoUrl}" alt="${set.name} overview photo" onerror="modalMediaError(this)">`, set.name + ' — Photo');
+  }
+
+  function openVideoModal(setId) {
+    const set = findSet(setId);
+    if (!set) return;
+    if (!set.videoUrl) {
+      openModal('<div style="color:#F9F5F1;font-size:13px;padding:40px 20px;text-align:center;">Walkthrough video not available yet.<br>Please contact Roomo support if this seems wrong.</div>', set.name + ' — Walkthrough');
+      return;
+    }
+    openModal(
+      `<video controls playsinline preload="metadata" ${set.videoPoster ? `poster="${set.videoPoster}"` : ''} onerror="modalMediaError(this)">
+         <source src="${set.videoUrl}">
+       </video>`,
+      set.name + ' — Walkthrough'
+    );
+  }
+
+  function modalMediaError(el) {
+    el.outerHTML = '<div style="color:#F9F5F1;font-size:13px;padding:40px 20px;text-align:center;">This media could not be loaded.<br>Please contact Roomo support.</div>';
+  }
+
+  function closeModal() {
+    // pause any playing video before closing
+    const vid = modalContent.querySelector('video');
+    if (vid) vid.pause();
+    modal.classList.remove('show');
+    document.body.classList.remove('modal-open');
+    modalContent.innerHTML = '';
+    if (lastFocused) lastFocused.focus();
+  }
+
+  modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && modal.classList.contains('show')) closeModal();
+  });
+
+  /* ---------- report issue ---------- */
+  function reportIssue(setId = null) {
+    // TODO BACKEND:
+    // Open support form, support URL, chat, or issue reporting flow.
+    console.log('reportIssue', ROOMO_INSPECTION.orderId, setId);
+    if (ROOMO_INSPECTION.supportUrl && ROOMO_INSPECTION.supportUrl !== '#') {
+      window.location.href = ROOMO_INSPECTION.supportUrl;
+    }
+  }
+
+  /* ---------- signature pad ---------- */
+  const canvas = document.getElementById('sigPad');
+  const ctx = canvas.getContext('2d');
+  let drawing = false, hasSig = false;
+
+  function resizeCanvas() {
+    let saved = null;
+    if (hasSig && canvas.width > 0 && canvas.height > 0) {
+      saved = document.createElement('canvas');
+      saved.width = canvas.width;
+      saved.height = canvas.height;
+      saved.getContext('2d').drawImage(canvas, 0, 0);
+    }
+    const ratio = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * ratio;
+    canvas.height = rect.height * ratio;
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    ctx.strokeStyle = '#3D342F';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    if (saved) ctx.drawImage(saved, 0, 0, saved.width, saved.height, 0, 0, rect.width, rect.height);
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  function pos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const p = e.touches ? e.touches[0] : e;
+    return { x: p.clientX - rect.left, y: p.clientY - rect.top };
+  }
+  function startSig(e) {
+    drawing = true;
+    hasSig = true;
+    document.getElementById('sigPlaceholder').style.display = 'none';
+    document.getElementById('clearSigBtn').classList.add('visible');
+    const p = pos(e);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    e.preventDefault();
+  }
+  function moveSig(e) {
+    if (!drawing) return;
+    const p = pos(e);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    e.preventDefault();
+  }
+  function endSig() { drawing = false; checkFormValid(); }
+
+  canvas.addEventListener('mousedown', startSig);
+  canvas.addEventListener('mousemove', moveSig);
+  window.addEventListener('mouseup', endSig);
+  canvas.addEventListener('touchstart', startSig, { passive: false });
+  canvas.addEventListener('touchmove', moveSig, { passive: false });
+  canvas.addEventListener('touchend', endSig);
+
+  function clearSig() {
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+    hasSig = false;
+    document.getElementById('sigPlaceholder').style.display = 'block';
+    document.getElementById('clearSigBtn').classList.remove('visible');
+    checkFormValid();
+  }
+
+  /* ---------- validation ---------- */
+  function checkFormValid() {
+    const agreed = document.getElementById('agreeBox').checked;
+    const name = document.getElementById('printedName').value.trim().length > 0;
+    document.getElementById('submitBtn').disabled = !(agreed && name && hasSig);
+  }
+  checkFormValid();
+
+  /* ---------- submit ---------- */
+  let submitting = false;
+  async function submitCustomerReceipt() {
+    if (submitting) return;
+    submitting = true;
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Submitting…';
+
+    const payload = {
+      orderId: ROOMO_INSPECTION.orderId,
+      customerName: document.getElementById('printedName').value.trim(),
+      agreed: true,
+      signedAt: new Date().toISOString(),
+      signatureDataUrl: canvas.toDataURL('image/png'),
+      inspectionDeadline: ROOMO_INSPECTION.inspectionDeadline
+    };
+
+    try {
+      // TODO BACKEND:
+      // 1. Save agreement checkbox state
+      // 2. Save printed name
+      // 3. Save signature image
+      // 4. Save confirmation timestamp
+      // 5. Save order ID
+      // 6. Preserve the backend-provided 48-hour deadline
+      console.log('submitCustomerReceipt payload', payload);
+      await new Promise(r => setTimeout(r, 600)); // simulated latency
+
+      document.getElementById('formBody').classList.add('hide');
+      document.getElementById('successState').classList.add('show');
+      window.scrollTo(0, 0);
+    } catch (err) {
+      submitting = false;
+      btn.disabled = false;
+      btn.textContent = 'Confirm Receipt';
+      alertBar('We couldn\'t submit your confirmation. Please check your connection and try again.');
+    }
+  }
+
+  function alertBar(msg) {
+    // lightweight inline error (no browser alert)
+    let bar = document.getElementById('errBar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'errBar';
+      bar.style.cssText = 'margin:0 24px 16px;padding:12px 14px;border:1px solid #C9A9A5;background:#F4E9E7;border-radius:8px;font-size:12.5px;color:#865651;line-height:1.45;';
+      document.querySelector('.submit-wrap').prepend(bar);
+    }
+    bar.textContent = msg;
+  }
+</script>
+
+</body>
+</html>

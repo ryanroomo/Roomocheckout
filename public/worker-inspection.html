@@ -1,0 +1,1557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>ROOMO — Virtual Inspection</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700&family=League+Spartan:wght@300;400;500;600&family=MuseoModerno:wght@500&display=swap');
+
+  :root {
+    --bg: #EDE8E2;
+    --card: #F9F5F1;
+    --card-alt: #F4F0EA;
+    --ink: #3D342F;
+    --brown-dark: #49372A;
+    --brown-accent: #865651;
+    --text-body: #816E68;
+    --text-muted: #A89595;
+    --border: #E5DDD6;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    font-family: 'League Spartan', -apple-system, sans-serif;
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+  body.lock { overflow: hidden; }
+
+  button { font-family: 'League Spartan', sans-serif; }
+  button:focus-visible { outline: 2px solid var(--brown-accent); outline-offset: 2px; }
+
+  /* =============== app shell =============== */
+  .app {
+    max-width: 640px;
+    margin: 0 auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    background: var(--card);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+  @media (min-width: 640px) {
+    .app { box-shadow: 0 1px 3px rgba(61,52,47,0.05); }
+  }
+
+  .screen { display: none; flex: 1; flex-direction: column; }
+  .screen.active { display: flex; }
+
+  /* =============== top bar =============== */
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--card);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    min-height: 56px;
+  }
+  .topbar .back-btn {
+    width: 44px;
+    height: 44px;
+    margin-left: -10px;
+    border: none;
+    background: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 50%;
+    color: var(--ink);
+    flex-shrink: 0;
+  }
+  .topbar .back-btn:active { background: var(--card-alt); }
+  .topbar .bar-title {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--ink);
+    line-height: 1.2;
+  }
+  .topbar .bar-step {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  /* =============== buttons =============== */
+  .btn-primary {
+    width: 100%;
+    min-height: 56px;
+    border: none;
+    border-radius: 36px;
+    background: var(--brown-dark);
+    color: #F9F5F1;
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.4px;
+    padding: 16px;
+    cursor: pointer;
+    transition: transform .1s ease, opacity .2s ease;
+  }
+  .btn-primary:not(:disabled):active { transform: scale(0.98); }
+  .btn-primary:disabled { background: var(--text-muted); opacity: 0.6; cursor: not-allowed; }
+  .btn-secondary {
+    width: 100%;
+    min-height: 56px;
+    border: 1.5px solid var(--brown-dark);
+    border-radius: 36px;
+    background: transparent;
+    color: var(--brown-dark);
+    font-size: 15px;
+    font-weight: 500;
+    padding: 16px;
+    cursor: pointer;
+  }
+  .btn-secondary:active { background: var(--card-alt); }
+  .btn-text {
+    border: none;
+    background: none;
+    color: var(--brown-accent);
+    font-size: 13px;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 12px;
+    min-height: 44px;
+  }
+
+  .action-footer {
+    position: sticky;
+    bottom: 0;
+    background: linear-gradient(to top, var(--card) 75%, rgba(249,245,241,0));
+    padding: 18px 24px calc(20px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: auto;
+    z-index: 5;
+  }
+
+  /* =============== home =============== */
+  .home-header {
+    text-align: center;
+    padding: 34px 24px 8px;
+  }
+  .logo {
+    font-family: 'MuseoModerno', Georgia, serif;
+    font-weight: 500;
+    font-size: 26px;
+    letter-spacing: 0.5px;
+    color: var(--brown-dark);
+  }
+  .kicker {
+    margin-top: 7px;
+    font-family: 'Manrope', sans-serif;
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .order-card {
+    margin: 20px 24px 0;
+    background: var(--card-alt);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--text-body);
+  }
+  .order-card b {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--ink);
+  }
+
+  .progress-wrap { margin: 18px 24px 4px; }
+  .progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11.5px;
+    color: var(--text-muted);
+    margin-bottom: 7px;
+  }
+  .progress-label .pl-title {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 700;
+    font-size: 10px;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--brown-accent);
+  }
+  .progress-track {
+    height: 4px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--brown-accent);
+    border-radius: 4px;
+    transition: width .35s ease;
+  }
+
+  .set-list { padding: 16px 24px 24px; display: flex; flex-direction: column; gap: 12px; }
+  .set-card {
+    text-align: left;
+    width: 100%;
+    border: 1px solid var(--border);
+    background: var(--card);
+    border-radius: 12px;
+    padding: 16px;
+    cursor: pointer;
+    transition: border-color .15s ease;
+    font-family: 'League Spartan', sans-serif;
+  }
+  .set-card:active { border-color: var(--brown-accent); }
+  /* strong per-status tinting so workers can read state at a glance */
+  .set-card.st-not { background: #FAEEEC; border-color: #E5C0B9; }
+  .set-card.st-done { background: #EEF5E9; border-color: #C2D9B4; }
+  .set-card .sc-top { display: flex; align-items: center; gap: 12px; }
+  .set-card .sc-name {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 600;
+    font-size: 14.5px;
+    color: var(--ink);
+  }
+  .set-card .sc-items {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 3px;
+    line-height: 1.4;
+  }
+  .set-card .sc-status {
+    margin-left: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    font-family: 'Manrope', sans-serif;
+    font-weight: 700;
+    text-align: center;
+    min-width: 64px;
+  }
+  .set-card .sc-status.not-started { color: #B3261E; }
+  .set-card .sc-status.completed { color: #2E7D32; }
+  .set-card .sc-thumbs {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .sc-thumb {
+    width: 72px;
+    height: 54px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: var(--card-alt);
+    position: relative;
+    flex-shrink: 0;
+  }
+  .sc-thumb img, .sc-thumb video {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .sc-thumb .mini-play {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: rgba(61,52,47,0.65);
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: none;
+  }
+  .sc-thumb .mini-dur {
+    position: absolute;
+    bottom: 3px; right: 3px;
+    background: rgba(61,52,47,0.72);
+    color: #F9F5F1;
+    font-size: 8.5px;
+    font-family: 'Manrope', sans-serif;
+    padding: 1px 5px;
+    border-radius: 12px;
+    pointer-events: none;
+  }
+  .set-card .sc-cta {
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--brown-dark);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* =============== instructions =============== */
+  .instructions {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 40px 28px 0;
+  }
+  .instructions h1 {
+    font-family: 'Manrope', sans-serif;
+    font-size: 21px;
+    font-weight: 700;
+    color: var(--brown-dark);
+    margin: 0 0 24px;
+    text-align: center;
+  }
+  .rule {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px dashed var(--border);
+  }
+  .rule:last-of-type { border-bottom: none; }
+  .rule .rule-icon {
+    width: 38px; height: 38px;
+    border-radius: 10px;
+    background: var(--card-alt);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .rule p {
+    margin: 4px 0 0;
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--text-body);
+  }
+
+  /* =============== step pages (photo / video) =============== */
+  .step-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 22px 24px 0;
+  }
+  .step-body h2 {
+    font-family: 'Manrope', sans-serif;
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--brown-dark);
+    margin: 0 0 8px;
+  }
+  .step-body .lead {
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--text-body);
+    margin: 0 0 6px;
+  }
+  .step-body .hint {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-muted);
+    margin: 0 0 16px;
+  }
+
+  .viewfinder {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    max-height: 52vh;
+    background: var(--ink);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .viewfinder video {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .viewfinder .vf-fallback {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    color: var(--card);
+    text-align: center;
+    padding: 24px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  /* recording overlays */
+  .rec-overlay {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .rec-overlay.show { display: flex; }
+  .countdown-num {
+    font-family: 'Manrope', sans-serif;
+    font-size: 88px;
+    font-weight: 700;
+    color: #F9F5F1;
+    text-shadow: 0 2px 18px rgba(0,0,0,0.4);
+  }
+  .rec-status {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    background: rgba(61,52,47,0.72);
+    border-radius: 30px;
+    padding: 7px 14px;
+    color: #F9F5F1;
+    font-family: 'Manrope', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .rec-status.show { display: flex; }
+  .rec-dot {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: #C0564E;
+    animation: blink 1s infinite;
+  }
+  @keyframes blink { 50% { opacity: 0.25; } }
+  .rec-ring {
+    position: absolute;
+    top: 12px; right: 12px;
+    display: none;
+  }
+  .rec-ring.show { display: block; }
+  .rec-hint {
+    position: absolute;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(61,52,47,0.72);
+    color: #F9F5F1;
+    border-radius: 30px;
+    padding: 8px 16px;
+    font-size: 12px;
+    white-space: nowrap;
+    display: none;
+  }
+  .rec-hint.show { display: block; }
+
+  /* preview media */
+  .preview-media {
+    width: 100%;
+    max-height: 52vh;
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .preview-media img, .preview-media video {
+    width: 100%;
+    max-height: 52vh;
+    object-fit: contain;
+    display: block;
+    background: #000;
+  }
+  .preview-q {
+    font-family: 'Manrope', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--brown-dark);
+    margin: 18px 0 6px;
+    text-align: center;
+  }
+  .preview-sub {
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text-body);
+    margin: 0;
+    text-align: center;
+  }
+
+  /* =============== set complete / success =============== */
+  .center-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 40px 32px 0;
+  }
+  .center-state .big-check {
+    width: 74px; height: 74px;
+    border-radius: 50%;
+    background: var(--brown-dark);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 22px;
+  }
+  .center-state h2 {
+    font-family: 'Manrope', sans-serif;
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--brown-dark);
+    margin: 0 0 8px;
+  }
+  .center-state p {
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--text-body);
+    margin: 0;
+  }
+  .thumb-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 22px;
+    justify-content: center;
+  }
+  .thumb-row .sc-thumb { width: 120px; height: 90px; }
+
+  /* =============== review list =============== */
+  .review-list { padding: 20px 24px 0; }
+  .review-item {
+    display: flex;
+    flex-direction: column;
+    padding: 14px 0;
+    border-bottom: 1px dashed var(--border);
+  }
+  .review-item:last-child { border-bottom: none; }
+  .review-item .ri-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .review-item .ri-name {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--ink);
+    flex: 1;
+  }
+  .review-item .sc-thumbs { display: flex; gap: 8px; margin-top: 10px; }
+
+  /* =============== modal =============== */
+  .modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgba(61,52,47,0.55);
+    align-items: center;
+    justify-content: center;
+    padding: 28px;
+  }
+  .modal.show { display: flex; }
+  .modal-box {
+    background: var(--card);
+    border-radius: 14px;
+    padding: 24px;
+    width: 100%;
+    max-width: 380px;
+    text-align: center;
+  }
+  .modal-box h3 {
+    font-family: 'Manrope', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--brown-dark);
+    margin: 0 0 8px;
+  }
+  .modal-box p {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-body);
+    margin: 0 0 18px;
+  }
+  .modal-box .btn-primary { margin-bottom: 10px; }
+
+  /* error panel inside viewfinder area */
+  .error-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 30px;
+    gap: 8px;
+  }
+  .error-panel h3 {
+    font-family: 'Manrope', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--brown-dark);
+    margin: 12px 0 0;
+  }
+  .error-panel p {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-body);
+    margin: 0 0 10px;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ============ HOME ============ -->
+  <div class="screen active" id="screen-home">
+    <div class="home-header">
+      <div class="logo">ROOMO</div>
+      <div class="kicker">Virtual Inspection</div>
+    </div>
+
+    <div class="order-card" id="orderCard"></div>
+
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span class="pl-title">Inspection progress</span>
+        <span id="progressText"></span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+
+    <div class="set-list" id="setList"></div>
+
+    <div class="action-footer" id="homeFooter" style="display:none;">
+      <button type="button" class="btn-primary" onclick="goReview()">Submit inspection</button>
+    </div>
+  </div>
+
+  <!-- ============ INSTRUCTIONS ============ -->
+  <div class="screen" id="screen-instructions">
+    <div class="instructions">
+      <h1>Before you start</h1>
+
+      <div class="rule">
+        <span class="rule-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#865651" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-6.5 8-6.5s8 2.5 8 6.5"/><path d="M3 3l18 18"/></svg></span>
+        <p>Keep people out of the frame.</p>
+      </div>
+      <div class="rule">
+        <span class="rule-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#865651" stroke-width="1.7" stroke-linecap="round"><path d="M12 3a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3z"/><path d="M19 11a7 7 0 0 1-14 0"/><path d="M3 3l18 18"/></svg></span>
+        <p>Do not speak while recording.</p>
+      </div>
+      <div class="rule">
+        <span class="rule-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#865651" stroke-width="1.7" stroke-linecap="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 9h16"/><path d="M3 3l18 18"/></svg></span>
+        <p>Avoid faces, mirrors, and personal belongings.</p>
+      </div>
+      <div class="rule">
+        <span class="rule-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#865651" stroke-width="1.7" stroke-linecap="round"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 1 4 10.5c-.8.7-1 1.5-1 2.5h-6c0-1-.2-1.8-1-2.5A6 6 0 0 1 12 3z"/></svg></span>
+        <p>Turn on the lights and make sure the room is clear.</p>
+      </div>
+    </div>
+    <div class="action-footer">
+      <button type="button" class="btn-primary" onclick="instructionsDone()">Got it</button>
+    </div>
+  </div>
+
+  <!-- ============ PHOTO CAPTURE ============ -->
+  <div class="screen" id="screen-photo">
+    <div class="topbar">
+      <button type="button" class="back-btn" aria-label="Back" onclick="tryLeaveStep('photo')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div>
+        <div class="bar-title" id="photoBarTitle"></div>
+        <div class="bar-step">Step 1 of 2 · Photo</div>
+      </div>
+    </div>
+
+    <div class="step-body">
+      <h2>Take one full-set photo</h2>
+      <p class="lead" id="photoLead"></p>
+      <p class="hint">Include the full outer edge of the rug and do not crop any furniture.</p>
+
+      <div class="viewfinder" id="photoViewfinder">
+        <video id="photoLive" autoplay playsinline muted></video>
+        <div class="vf-fallback" id="photoFallback" style="display:none;">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#F9F5F1" stroke-width="1.5"><path d="M4 7h3l2-2h6l2 2h3v13H4z"/><circle cx="12" cy="13" r="4"/></svg>
+          <span>Live camera preview isn't available.<br>Use the button below to take the photo with your camera app.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="action-footer">
+      <button type="button" class="btn-primary" id="takePhotoBtn" onclick="takePhoto()">Take photo</button>
+      <!-- fallback capture input (hidden label-trigger) -->
+      <input type="file" id="photoFileInput" accept="image/*" capture="environment" style="display:none" onchange="photoFilePicked(this)">
+    </div>
+  </div>
+
+  <!-- ============ PHOTO PREVIEW ============ -->
+  <div class="screen" id="screen-photo-preview">
+    <div class="topbar">
+      <button type="button" class="back-btn" aria-label="Back" onclick="tryLeaveStep('photo-preview')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div>
+        <div class="bar-title" id="photoPrevBarTitle"></div>
+        <div class="bar-step">Step 1 of 2 · Photo</div>
+      </div>
+    </div>
+
+    <div class="step-body">
+      <div class="preview-media"><img id="photoPreviewImg" alt="Overview photo preview"></div>
+      <p class="preview-q">Can you see every item completely?</p>
+      <p class="preview-sub">Check that no furniture is cropped and the full rug edge is visible.</p>
+    </div>
+
+    <div class="action-footer">
+      <button type="button" class="btn-primary" onclick="usePhoto()">Use this photo</button>
+      <button type="button" class="btn-secondary" onclick="retakePhoto()">Retake</button>
+    </div>
+  </div>
+
+  <!-- ============ VIDEO INTRO ============ -->
+  <div class="screen" id="screen-video-intro">
+    <div class="topbar">
+      <button type="button" class="back-btn" aria-label="Back" onclick="showScreen('screen-home'); stopCamera();">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div>
+        <div class="bar-title" id="videoIntroBarTitle"></div>
+        <div class="bar-step">Step 2 of 2 · Video</div>
+      </div>
+    </div>
+
+    <div class="step-body">
+      <h2>Record a 7-second walkthrough</h2>
+      <p class="lead">Slowly move around the furniture so the customer can see the set from more than one angle.</p>
+
+      <div style="display:flex; align-items:center; gap:14px; background:var(--card-alt); border-radius:12px; padding:16px; margin-top:8px;">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#865651" stroke-width="1.6" stroke-linecap="round" style="flex-shrink:0;">
+          <path d="M4 14a8 8 0 0 1 14.9-4"/>
+          <path d="M19.5 6.5L19 10l-3.4-.6"/>
+          <rect x="9.5" y="13" width="5" height="7" rx="1"/>
+        </svg>
+        <div style="font-size:12.5px; line-height:1.7; color:var(--text-body);">
+          Move slowly.<br>
+          Keep the phone steady.<br>
+          Do not speak.<br>
+          Keep people out of the frame.
+        </div>
+      </div>
+    </div>
+
+    <div class="action-footer">
+      <button type="button" class="btn-primary" onclick="goVideoRecord()">Start recording</button>
+    </div>
+  </div>
+
+  <!-- ============ VIDEO RECORD ============ -->
+  <div class="screen" id="screen-video-record">
+    <div class="topbar">
+      <div style="width:34px;"></div>
+      <div>
+        <div class="bar-title" id="videoRecBarTitle"></div>
+        <div class="bar-step">Step 2 of 2 · Video</div>
+      </div>
+    </div>
+
+    <div class="step-body">
+      <div class="viewfinder" id="videoViewfinder" style="max-height:60vh;">
+        <video id="videoLive" autoplay playsinline muted></video>
+
+        <div class="rec-overlay" id="countdownOverlay"><span class="countdown-num" id="countdownNum">3</span></div>
+
+        <div class="rec-status" id="recStatus"><span class="rec-dot"></span>Recording</div>
+
+        <svg class="rec-ring" id="recRing" width="44" height="44" viewBox="0 0 44 44">
+          <circle cx="22" cy="22" r="18" fill="rgba(61,52,47,0.5)"/>
+          <circle id="recRingArc" cx="22" cy="22" r="18" fill="none" stroke="#F9F5F1" stroke-width="3"
+                  stroke-linecap="round" stroke-dasharray="113.1" stroke-dashoffset="113.1"
+                  transform="rotate(-90 22 22)"/>
+          <text id="recRingText" x="22" y="26" text-anchor="middle" fill="#F9F5F1" font-size="12" font-family="Manrope, sans-serif" font-weight="600">7</text>
+        </svg>
+
+        <div class="rec-hint" id="recHint">Move slowly from one side to the other.</div>
+      </div>
+
+      <div class="error-panel" id="videoErrorPanel" style="display:none;">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#865651" stroke-width="1.6"><path d="M4 7h3l2-2h6l2 2h3v13H4z"/><circle cx="12" cy="13" r="4"/><path d="M3 3l18 18"/></svg>
+        <h3 id="videoErrorTitle">Camera access is needed</h3>
+        <p id="videoErrorText">Please allow camera access in your browser settings and try again.</p>
+        <button type="button" class="btn-secondary" style="width:auto; padding:14px 34px;" onclick="goVideoRecord()">Try again</button>
+      </div>
+    </div>
+
+    <div class="action-footer" id="recordFooter">
+      <button type="button" class="btn-text" id="cancelRecBtn" onclick="cancelRecording()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- ============ VIDEO PREVIEW ============ -->
+  <div class="screen" id="screen-video-preview">
+    <div class="topbar">
+      <button type="button" class="back-btn" aria-label="Back" onclick="tryLeaveStep('video-preview')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div>
+        <div class="bar-title" id="videoPrevBarTitle"></div>
+        <div class="bar-step">Step 2 of 2 · Video</div>
+      </div>
+    </div>
+
+    <div class="step-body">
+      <div class="preview-media"><video id="videoPreviewEl" controls playsinline muted preload="metadata"></video></div>
+      <p class="preview-q">Is the walkthrough clear and steady?</p>
+      <p class="preview-sub">Make sure the full set can be seen and no people appear in the video.</p>
+    </div>
+
+    <div class="action-footer">
+      <button type="button" class="btn-primary" onclick="useVideo()">Use this video</button>
+      <button type="button" class="btn-secondary" onclick="goVideoRecord()">Record again</button>
+    </div>
+  </div>
+
+  <!-- ============ SET COMPLETE ============ -->
+  <div class="screen" id="screen-set-complete">
+    <div class="center-state">
+      <span class="big-check">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#F9F5F1" stroke-width="2" stroke-linecap="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+      </span>
+      <h2 id="setCompleteTitle"></h2>
+      <p>The photo and walkthrough are ready.</p>
+      <div class="thumb-row" id="setCompleteThumbs"></div>
+    </div>
+    <div class="action-footer">
+      <button type="button" class="btn-primary" onclick="backHome()">Continue</button>
+    </div>
+  </div>
+
+  <!-- ============ COMPLETED SET DETAIL ============ -->
+  <div class="screen" id="screen-set-detail">
+    <div class="topbar">
+      <button type="button" class="back-btn" aria-label="Back" onclick="backHome()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div>
+        <div class="bar-title" id="setDetailBarTitle"></div>
+        <div class="bar-step">Completed</div>
+      </div>
+    </div>
+
+    <div class="step-body">
+      <div class="preview-media" style="margin-bottom:12px;"><img id="detailPhoto" alt="Overview photo"></div>
+      <div class="preview-media"><video id="detailVideo" controls playsinline muted preload="metadata"></video></div>
+      <div style="text-align:center; margin-top:16px;">
+        <button type="button" class="btn-text" onclick="redoSet()">Redo this set</button>
+      </div>
+    </div>
+
+    <div class="action-footer">
+      <button type="button" class="btn-primary" onclick="backHome()">Done</button>
+    </div>
+  </div>
+
+  <!-- ============ REVIEW / SUBMIT ============ -->
+  <div class="screen" id="screen-review">
+    <div class="topbar">
+      <button type="button" class="back-btn" aria-label="Back" onclick="backHome()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div>
+        <div class="bar-title">Ready to submit</div>
+        <div class="bar-step" id="reviewOrderId"></div>
+      </div>
+    </div>
+
+    <div class="review-list" id="reviewList"></div>
+
+    <div class="action-footer">
+      <button type="button" class="btn-primary" id="finalSubmitBtn" onclick="submitInspection()">Submit inspection</button>
+      <button type="button" class="btn-text" onclick="backHome()">Review</button>
+    </div>
+  </div>
+
+  <!-- ============ SUCCESS ============ -->
+  <div class="screen" id="screen-success">
+    <div class="center-state">
+      <span class="big-check">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#F9F5F1" stroke-width="2" stroke-linecap="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+      </span>
+      <h2>Inspection submitted</h2>
+      <p>The customer can now review and confirm the delivery.</p>
+    </div>
+    <div class="action-footer">
+      <button type="button" class="btn-primary" onclick="location.reload()">Done</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- leave-step confirm modal -->
+<div class="modal" id="leaveModal" role="dialog" aria-modal="true" aria-label="Leave this step?">
+  <div class="modal-box">
+    <h3>Leave this step?</h3>
+    <p id="leaveModalText">Your current photo will be discarded.</p>
+    <button type="button" class="btn-primary" onclick="closeLeaveModal()">Stay</button>
+    <button type="button" class="btn-text" onclick="confirmLeave()">Leave &amp; discard</button>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   Order binding — how the worker lands on the right order:
+   In the admin portal, each order has a "Create worker link"
+   button. The backend generates a one-time token bound to
+   that order (e.g. .../worker-inspection.html?token=abc123),
+   the admin copies the link and sends it to the worker.
+   Everything submitted from this page is attached to that
+   order via the token — the worker never picks an order.
+   ========================================================= */
+const WORKER_TOKEN = new URLSearchParams(location.search).get('token');
+
+async function loadOrderFromServer(token) {
+  // TODO BACKEND:
+  // GET /api/worker-inspection/{token}
+  //   -> { orderId, deliveryAddress, deliveryDate, sets: [...] }
+  // Invalid/expired token -> show a plain-language error page.
+  console.log('loadOrderFromServer token =', token);
+  return null; // no backend yet — fall back to mock data below
+}
+
+/* =========================================================
+   Mock order data — replaced by backend in production.
+   ========================================================= */
+const ROOMO_ORDER = {
+  orderId: "RM-10482",
+  customerName: "Jane Doe",
+  deliveryAddress: "123 Example Street, Brooklyn, NY",
+  deliveryDate: "August 10, 2026",
+  sets: [
+    { id: "living",  name: "Living Room Set", items: ["Sofa", "Rug", "Coffee Table", "Floor Lamp"] },
+    { id: "dining",  name: "Dining Set",      items: ["Dining Table", "Dining Chairs"] },
+    { id: "bedroom", name: "Bedroom Set",     items: ["Bed Frame", "Mattress", "Nightstand"] }
+  ]
+};
+
+/* =========================================================
+   State
+   ========================================================= */
+const state = {
+  hasSeenInstructions: false,
+  currentSetId: null,
+  pendingPhoto: null,   // { blob, url } — captured but not yet confirmed
+  pendingVideo: null,   // { blob, url }
+  sets: {}              // id -> { photoBlob, photoUrl, videoBlob, videoUrl, status }
+};
+ROOMO_ORDER.sets.forEach(s => {
+  state.sets[s.id] = { photoBlob: null, photoUrl: null, videoBlob: null, videoUrl: null, status: "not_started" };
+});
+
+let cameraStream = null;
+let mediaRecorder = null;
+let recordedChunks = [];
+let recTimerId = null;
+let countdownId = null;
+let leaveContext = null;   // which step the leave-modal refers to
+let submitting = false;
+
+/* =========================================================
+   Backend hooks — all future server logic lives here.
+   ========================================================= */
+async function uploadInspectionMedia(setId, mediaType, fileOrBlob) {
+  // TODO BACKEND: upload photo/video for a set
+  console.log('uploadInspectionMedia', setId, mediaType, fileOrBlob);
+}
+async function saveSetCompletion(setId) {
+  // TODO BACKEND: persist set completion state
+  console.log('saveSetCompletion', setId);
+}
+async function submitInspectionToServer(payload) {
+  // TODO BACKEND:
+  // 1. Upload confirmed photos
+  // 2. Upload confirmed videos
+  // 3. Save set completion states
+  // 4. Create customer inspection link
+  console.log('submitInspection payload', payload);
+  await new Promise(r => setTimeout(r, 900)); // simulated latency
+}
+
+/* =========================================================
+   Screen helpers
+   ========================================================= */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0, 0);
+}
+function getSetMeta(id) { return ROOMO_ORDER.sets.find(s => s.id === id); }
+
+/* =========================================================
+   Home rendering
+   ========================================================= */
+function renderHome() {
+  document.getElementById('orderCard').innerHTML =
+    `<b>Order #${ROOMO_ORDER.orderId}</b><br>${ROOMO_ORDER.deliveryAddress}<br>${ROOMO_ORDER.deliveryDate}`;
+
+  const total = ROOMO_ORDER.sets.length;
+  const done = ROOMO_ORDER.sets.filter(s => state.sets[s.id].status === 'completed').length;
+  document.getElementById('progressText').textContent = `${done} of ${total} sets completed`;
+  document.getElementById('progressFill').style.width = (done / total * 100) + '%';
+
+  const list = document.getElementById('setList');
+  list.innerHTML = '';
+  ROOMO_ORDER.sets.forEach(meta => {
+    const st = state.sets[meta.id];
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'set-card';
+    card.onclick = () => onSetCardClick(meta.id);
+
+    let statusHtml, extra = '';
+    if (st.status === 'completed') {
+      card.classList.add('st-done');
+      statusHtml = `<span class="sc-status completed">
+        <svg width="42" height="42" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="11" fill="#2E7D32"/>
+          <path d="M7 12.5l3.2 3.2L17 8.5" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Completed</span>`;
+      extra = `<div class="sc-thumbs">
+          <span class="sc-thumb"><img src="${st.photoUrl}" alt="${meta.name} photo"></span>
+          <span class="sc-thumb"><video src="${st.videoUrl}" muted playsinline preload="metadata"></video>
+            <span class="mini-play"><svg width="9" height="9" viewBox="0 0 24 24" fill="#F9F5F1"><path d="M8 5.5v13l11-6.5z"/></svg></span>
+            <span class="mini-dur">0:07</span>
+          </span>
+        </div>`;
+    } else if (st.status === 'in_progress') {
+      statusHtml = `<span class="sc-status">
+        <svg width="42" height="42" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="11" fill="#E8B54A"/>
+          <path d="M12 6.5v5.5l3.6 2.4" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round"/>
+        </svg>
+        In progress</span>`;
+      extra = `<div class="sc-cta">Continue inspection
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></div>`;
+    } else {
+      card.classList.add('st-not');
+      statusHtml = `<span class="sc-status not-started">
+        <svg width="42" height="42" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="11" fill="#C0392B"/>
+          <path d="M8.2 8.2l7.6 7.6M15.8 8.2l-7.6 7.6" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round"/>
+        </svg>
+        Not started</span>`;
+      extra = `<div class="sc-cta">Start inspection
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></div>`;
+    }
+
+    card.innerHTML = `
+      <div class="sc-top">
+        <div style="flex:1;">
+          <div class="sc-name">${meta.name}</div>
+          <div class="sc-items">${meta.items.join(', ')}</div>
+        </div>
+        ${statusHtml}
+      </div>
+      ${extra}`;
+    list.appendChild(card);
+  });
+
+  document.getElementById('homeFooter').style.display = (done === total) ? 'flex' : 'none';
+}
+
+function onSetCardClick(setId) {
+  state.currentSetId = setId;
+  const st = state.sets[setId];
+  if (st.status === 'completed') {
+    openSetDetail(setId);
+    return;
+  }
+  if (!state.hasSeenInstructions) {
+    showScreen('screen-instructions');
+    return;
+  }
+  startPhotoStep();
+}
+
+function instructionsDone() {
+  state.hasSeenInstructions = true;
+  startPhotoStep();
+}
+
+function backHome() {
+  stopCamera();
+  renderHome();
+  showScreen('screen-home');
+}
+
+/* =========================================================
+   Camera plumbing
+   ========================================================= */
+async function startCamera(videoElId, fallbackCb) {
+  stopCamera();
+  const videoEl = document.getElementById(videoElId);
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    fallbackCb && fallbackCb('unsupported');
+    return false;
+  }
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' } },
+      audio: false
+    });
+    videoEl.srcObject = cameraStream;
+    await videoEl.play().catch(() => {});
+    return true;
+  } catch (err) {
+    console.log('camera error', err);
+    fallbackCb && fallbackCb(err.name || 'error');
+    return false;
+  }
+}
+function stopCamera() {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+  }
+}
+
+/* =========================================================
+   Photo step
+   ========================================================= */
+async function startPhotoStep() {
+  const meta = getSetMeta(state.currentSetId);
+  document.getElementById('photoBarTitle').textContent = meta.name;
+  document.getElementById('photoLead').textContent =
+    `Make sure every item in the ${meta.name} is completely visible.`;
+  document.getElementById('photoFallback').style.display = 'none';
+  document.getElementById('photoLive').style.display = 'block';
+  showScreen('screen-photo');
+
+  const ok = await startCamera('photoLive', () => {
+    // graceful fallback: use native camera app via file input
+    document.getElementById('photoLive').style.display = 'none';
+    document.getElementById('photoFallback').style.display = 'flex';
+  });
+  if (state.sets[state.currentSetId].status === 'not_started') {
+    state.sets[state.currentSetId].status = 'in_progress';
+  }
+}
+
+function takePhoto() {
+  const live = document.getElementById('photoLive');
+  if (!cameraStream || live.style.display === 'none' || !live.videoWidth) {
+    // fallback: trigger native camera
+    document.getElementById('photoFileInput').click();
+    return;
+  }
+  const c = document.createElement('canvas');
+  c.width = live.videoWidth;
+  c.height = live.videoHeight;
+  c.getContext('2d').drawImage(live, 0, 0);
+  c.toBlob(blob => {
+    if (!blob) { showPhotoError(); return; }
+    setPendingPhoto(blob);
+  }, 'image/jpeg', 0.9);
+}
+
+function photoFilePicked(input) {
+  const file = input.files[0];
+  if (!file) return;
+  setPendingPhoto(file);
+  input.value = '';
+}
+
+function setPendingPhoto(blob) {
+  if (state.pendingPhoto) URL.revokeObjectURL(state.pendingPhoto.url);
+  state.pendingPhoto = { blob, url: URL.createObjectURL(blob) };
+  const meta = getSetMeta(state.currentSetId);
+  document.getElementById('photoPrevBarTitle').textContent = meta.name;
+  const img = document.getElementById('photoPreviewImg');
+  img.onerror = showPhotoError;
+  img.src = state.pendingPhoto.url;
+  stopCamera();
+  showScreen('screen-photo-preview');
+}
+
+function showPhotoError() {
+  // plain-language photo failure
+  discardPendingPhoto();
+  startPhotoStep();
+  const lead = document.getElementById('photoLead');
+  lead.textContent = "We couldn't read that photo. Please try taking it again.";
+}
+
+function retakePhoto() {
+  discardPendingPhoto();
+  startPhotoStep();
+}
+function discardPendingPhoto() {
+  if (state.pendingPhoto) { URL.revokeObjectURL(state.pendingPhoto.url); state.pendingPhoto = null; }
+}
+
+function usePhoto() {
+  const st = state.sets[state.currentSetId];
+  if (st.photoUrl) URL.revokeObjectURL(st.photoUrl);
+  st.photoBlob = state.pendingPhoto.blob;
+  st.photoUrl = state.pendingPhoto.url;
+  state.pendingPhoto = null;
+  uploadInspectionMedia(state.currentSetId, 'photo', st.photoBlob); // TODO BACKEND (stub)
+  goVideoIntro();
+}
+
+/* =========================================================
+   Video step
+   ========================================================= */
+function goVideoIntro() {
+  stopCamera();
+  const meta = getSetMeta(state.currentSetId);
+  document.getElementById('videoIntroBarTitle').textContent = meta.name;
+  showScreen('screen-video-intro');
+}
+
+async function goVideoRecord() {
+  const meta = getSetMeta(state.currentSetId);
+  document.getElementById('videoRecBarTitle').textContent = meta.name;
+  discardPendingVideo();
+
+  // reset UI
+  document.getElementById('videoErrorPanel').style.display = 'none';
+  document.getElementById('videoViewfinder').style.display = 'flex';
+  document.getElementById('countdownOverlay').classList.remove('show');
+  document.getElementById('recStatus').classList.remove('show');
+  document.getElementById('recRing').classList.remove('show');
+  document.getElementById('recHint').classList.remove('show');
+  showScreen('screen-video-record');
+
+  if (typeof MediaRecorder === 'undefined') {
+    showVideoError('Video recording is not supported in this browser.',
+                   'Please open this link in Safari or Chrome.');
+    return;
+  }
+
+  const ok = await startCamera('videoLive', () => {
+    showVideoError('Camera access is needed',
+                   'Please allow camera access in your browser settings and try again.');
+  });
+  if (!ok) return;
+
+  // 3-2-1 countdown, then record
+  runCountdown(3, startRecording);
+}
+
+function showVideoError(title, text) {
+  stopCamera();
+  document.getElementById('videoViewfinder').style.display = 'none';
+  document.getElementById('videoErrorPanel').style.display = 'flex';
+  document.getElementById('videoErrorTitle').textContent = title;
+  document.getElementById('videoErrorText').textContent = text;
+}
+
+function runCountdown(from, doneCb) {
+  const overlay = document.getElementById('countdownOverlay');
+  const num = document.getElementById('countdownNum');
+  overlay.classList.add('show');
+  let n = from;
+  num.textContent = n;
+  clearInterval(countdownId);
+  countdownId = setInterval(() => {
+    n--;
+    if (n <= 0) {
+      clearInterval(countdownId);
+      overlay.classList.remove('show');
+      doneCb();
+    } else {
+      num.textContent = n;
+    }
+  }, 1000);
+}
+
+const REC_SECONDS = 7;
+
+function startRecording() {
+  if (!cameraStream) return;
+  recordedChunks = [];
+
+  let options = {};
+  if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('video/webm')) {
+    options.mimeType = 'video/webm';
+  } else if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('video/mp4')) {
+    options.mimeType = 'video/mp4';
+  }
+
+  try {
+    mediaRecorder = new MediaRecorder(cameraStream, options);
+  } catch (e) {
+    try { mediaRecorder = new MediaRecorder(cameraStream); }
+    catch (e2) {
+      showVideoError('Video recording is not supported in this browser.',
+                     'Please open this link in Safari or Chrome.');
+      return;
+    }
+  }
+
+  mediaRecorder.ondataavailable = e => { if (e.data && e.data.size) recordedChunks.push(e.data); };
+  mediaRecorder.onerror = () => {
+    stopRecordingUI();
+    showVideoError("We couldn't record the video.", 'Please try again.');
+  };
+  mediaRecorder.onstop = () => {
+    stopRecordingUI();
+    if (!recordedChunks.length) {
+      showVideoError("We couldn't record the video.", 'Please try again.');
+      return;
+    }
+    const type = mediaRecorder.mimeType || 'video/webm';
+    const blob = new Blob(recordedChunks, { type });
+    state.pendingVideo = { blob, url: URL.createObjectURL(blob) };
+    openVideoPreview();
+  };
+
+  mediaRecorder.start();
+
+  // recording UI
+  document.getElementById('recStatus').classList.add('show');
+  document.getElementById('recRing').classList.add('show');
+  document.getElementById('recHint').classList.add('show');
+
+  // 7s ring countdown
+  const arc = document.getElementById('recRingArc');
+  const txt = document.getElementById('recRingText');
+  const totalLen = 113.1;
+  const startT = performance.now();
+
+  function tick(now) {
+    const elapsed = (now - startT) / 1000;
+    const remain = Math.max(0, REC_SECONDS - elapsed);
+    arc.style.strokeDashoffset = totalLen * (remain / REC_SECONDS);
+    txt.textContent = Math.ceil(remain);
+    if (remain > 0 && mediaRecorder && mediaRecorder.state === 'recording') {
+      recTimerId = requestAnimationFrame(tick);
+    }
+  }
+  recTimerId = requestAnimationFrame(tick);
+
+  // auto-stop after 7 seconds — worker never presses stop
+  setTimeout(() => {
+    if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+  }, REC_SECONDS * 1000);
+}
+
+function stopRecordingUI() {
+  cancelAnimationFrame(recTimerId);
+  document.getElementById('recStatus').classList.remove('show');
+  document.getElementById('recRing').classList.remove('show');
+  document.getElementById('recHint').classList.remove('show');
+}
+
+function cancelRecording() {
+  clearInterval(countdownId);
+  document.getElementById('countdownOverlay').classList.remove('show');
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.onstop = null; // discard
+    mediaRecorder.stop();
+  }
+  stopRecordingUI();
+  stopCamera();
+  goVideoIntro();
+}
+
+function openVideoPreview() {
+  stopCamera();
+  const meta = getSetMeta(state.currentSetId);
+  document.getElementById('videoPrevBarTitle').textContent = meta.name;
+  const v = document.getElementById('videoPreviewEl');
+  v.onerror = () => {
+    discardPendingVideo();
+    showScreen('screen-video-record');
+    showVideoError("We couldn't play that video.", 'Please record it again.');
+  };
+  v.src = state.pendingVideo.url;
+  showScreen('screen-video-preview');
+}
+
+function discardPendingVideo() {
+  if (state.pendingVideo) { URL.revokeObjectURL(state.pendingVideo.url); state.pendingVideo = null; }
+}
+
+function useVideo() {
+  const st = state.sets[state.currentSetId];
+  if (st.videoUrl) URL.revokeObjectURL(st.videoUrl);
+  st.videoBlob = state.pendingVideo.blob;
+  st.videoUrl = state.pendingVideo.url;
+  state.pendingVideo = null;
+  st.status = 'completed';
+  uploadInspectionMedia(state.currentSetId, 'video', st.videoBlob); // TODO BACKEND (stub)
+  saveSetCompletion(state.currentSetId);                            // TODO BACKEND (stub)
+  showSetComplete();
+}
+
+/* =========================================================
+   Set complete + detail
+   ========================================================= */
+function showSetComplete() {
+  const meta = getSetMeta(state.currentSetId);
+  const st = state.sets[state.currentSetId];
+  document.getElementById('setCompleteTitle').textContent = `${meta.name} complete`;
+  document.getElementById('setCompleteThumbs').innerHTML = `
+    <span class="sc-thumb"><img src="${st.photoUrl}" alt="${meta.name} photo"></span>
+    <span class="sc-thumb"><video src="${st.videoUrl}" muted playsinline preload="metadata"></video>
+      <span class="mini-play"><svg width="11" height="11" viewBox="0 0 24 24" fill="#F9F5F1"><path d="M8 5.5v13l11-6.5z"/></svg></span>
+      <span class="mini-dur">0:07</span>
+    </span>`;
+  showScreen('screen-set-complete');
+}
+
+function openSetDetail(setId) {
+  const meta = getSetMeta(setId);
+  const st = state.sets[setId];
+  document.getElementById('setDetailBarTitle').textContent = meta.name;
+  document.getElementById('detailPhoto').src = st.photoUrl;
+  document.getElementById('detailVideo').src = st.videoUrl;
+  showScreen('screen-set-detail');
+}
+
+function redoSet() {
+  const st = state.sets[state.currentSetId];
+  st.status = 'in_progress';
+  startPhotoStep();
+}
+
+/* =========================================================
+   Leave-step confirm
+   ========================================================= */
+function tryLeaveStep(from) {
+  if (from === 'photo-preview' && state.pendingPhoto) {
+    leaveContext = 'photo-preview';
+    document.getElementById('leaveModalText').textContent = 'Your current photo will be discarded.';
+    document.getElementById('leaveModal').classList.add('show');
+    return;
+  }
+  if (from === 'video-preview' && state.pendingVideo) {
+    leaveContext = 'video-preview';
+    document.getElementById('leaveModalText').textContent = 'Your current video will be discarded.';
+    document.getElementById('leaveModal').classList.add('show');
+    return;
+  }
+  // nothing pending — just go back
+  stopCamera();
+  if (from === 'photo') { backHome(); }
+  else { backHome(); }
+}
+function closeLeaveModal() {
+  leaveContext = null;
+  document.getElementById('leaveModal').classList.remove('show');
+}
+function confirmLeave() {
+  if (leaveContext === 'photo-preview') discardPendingPhoto();
+  if (leaveContext === 'video-preview') discardPendingVideo();
+  closeLeaveModal();
+  backHome();
+}
+document.getElementById('leaveModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('leaveModal')) closeLeaveModal();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('leaveModal').classList.contains('show')) closeLeaveModal();
+});
+
+/* =========================================================
+   Review + submit
+   ========================================================= */
+function goReview() {
+  document.getElementById('reviewOrderId').textContent = `Order #${ROOMO_ORDER.orderId}`;
+  const list = document.getElementById('reviewList');
+  list.innerHTML = '';
+  ROOMO_ORDER.sets.forEach(meta => {
+    const st = state.sets[meta.id];
+    const item = document.createElement('div');
+    item.className = 'review-item';
+    item.innerHTML = `
+      <div class="ri-top">
+        <span class="ri-name">${meta.name}</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#865651" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg>
+      </div>
+      <div class="sc-thumbs">
+        <span class="sc-thumb"><img src="${st.photoUrl}" alt="${meta.name} photo"></span>
+        <span class="sc-thumb"><video src="${st.videoUrl}" muted playsinline preload="metadata"></video>
+          <span class="mini-play"><svg width="9" height="9" viewBox="0 0 24 24" fill="#F9F5F1"><path d="M8 5.5v13l11-6.5z"/></svg></span>
+          <span class="mini-dur">0:07</span>
+        </span>
+      </div>`;
+    list.appendChild(item);
+  });
+  showScreen('screen-review');
+}
+
+async function submitInspection() {
+  if (submitting) return;
+  submitting = true;
+  const btn = document.getElementById('finalSubmitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting inspection…';
+
+  const payload = {
+    token: WORKER_TOKEN,          // binds this submission to the order
+    orderId: ROOMO_ORDER.orderId,
+    submittedAt: new Date().toISOString(),
+    sets: ROOMO_ORDER.sets.map(meta => ({
+      id: meta.id,
+      name: meta.name,
+      status: state.sets[meta.id].status
+      // blobs are uploaded via uploadInspectionMedia()
+    }))
+  };
+
+  try {
+    await submitInspectionToServer(payload);
+    showScreen('screen-success');
+  } catch (err) {
+    submitting = false;
+    btn.disabled = false;
+    btn.textContent = 'Submit inspection';
+    // plain-language failure
+    const list = document.getElementById('reviewList');
+    let bar = document.getElementById('submitErr');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'submitErr';
+      bar.style.cssText = 'margin:14px 0 0;padding:12px 14px;border:1px solid #C9A9A5;background:#F4E9E7;border-radius:8px;font-size:12.5px;color:#865651;line-height:1.45;';
+      list.appendChild(bar);
+    }
+    bar.textContent = "We couldn't submit the inspection. Check your connection and try again.";
+  }
+}
+
+/* =========================================================
+   Init
+   ========================================================= */
+renderHome();
+</script>
+
+</body>
+</html>
