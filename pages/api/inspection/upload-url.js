@@ -44,9 +44,19 @@ export default async function handler(req, res) {
     const ext = EXT[contentType] || (mediaType === "photo" ? "jpg" : "webm");
     const path = `${auth.orderId}/${setType}-${mediaType}-${Date.now()}.${ext}`;
 
-    const { data, error } = await supabase.storage
+    let { data, error } = await supabase.storage
       .from("inspections")
       .createSignedUploadUrl(path);
+
+    // Self-heal: newer Supabase projects reject `insert into storage.buckets`
+    // from the SQL editor, so the migration's bucket insert can silently
+    // fail. The service role CAN create buckets through the API.
+    if (error && /not exist|not found/i.test(error.message || "")) {
+      await supabase.storage.createBucket("inspections", { public: false });
+      ({ data, error } = await supabase.storage
+        .from("inspections")
+        .createSignedUploadUrl(path));
+    }
     if (error) throw new Error(error.message);
 
     return res.status(200).json({ path, signedUrl: data.signedUrl });

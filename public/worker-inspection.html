@@ -135,15 +135,14 @@
   }
 
   .action-footer {
-    position: sticky;
-    bottom: 0;
-    background: linear-gradient(to top, var(--card) 75%, rgba(249,245,241,0));
+    /* In normal flow (not sticky) so buttons never cover the content —
+       when a screen is taller than the viewport you scroll to them. */
+    background: var(--card);
     padding: 18px 24px calc(20px + env(safe-area-inset-bottom));
     display: flex;
     flex-direction: column;
     gap: 10px;
     margin-top: auto;
-    z-index: 5;
   }
 
   /* =============== home =============== */
@@ -1005,6 +1004,15 @@ async function init() {
       if (st.photoPath && st.videoPath) st.status = "completed";
     }
     renderHome();
+    // First-frame thumbs for previously uploaded videos (async, re-render when ready)
+    for (const [setId, m] of Object.entries(media)) {
+      const st = state.sets[setId];
+      if (st && m.videoUrl) {
+        makeVideoThumb(m.videoUrl).then(t => {
+          if (t) { st.videoThumb = t; if (document.getElementById('screen-home').classList.contains('active')) renderHome(); }
+        });
+      }
+    }
   } catch (e) {
     console.log('order load failed', e);
     showFatal("This link isn't valid anymore, or the order couldn't be loaded. Ask the Roomo team to send you a new link.");
@@ -1056,6 +1064,61 @@ async function uploadInspectionMedia(setId, mediaType, blob) {
   });
   if (!put.ok) throw new Error('Upload failed (' + put.status + ')');
   return d.path;
+}
+
+/* =========================================================
+   Video thumbnails — iOS Safari won't paint a <video>'s first
+   frame on its own, so grab frame 0 onto a canvas and use a
+   real <img>. Falls back to <video src="...#t=0.1"> if the
+   capture fails (e.g. tainted canvas on cross-origin media).
+   ========================================================= */
+function makeVideoThumb(url) {
+  return new Promise(resolve => {
+    const v = document.createElement('video');
+    v.muted = true;
+    v.playsInline = true;
+    v.preload = 'auto';
+    v.crossOrigin = 'anonymous';
+    let done = false;
+    function finish() {
+      if (done) return;
+      done = true;
+      try {
+        const w = v.videoWidth, h = v.videoHeight;
+        if (!w || !h) return resolve(null);
+        const scale = Math.min(1, 480 / w);
+        const c = document.createElement('canvas');
+        c.width = Math.round(w * scale);
+        c.height = Math.round(h * scale);
+        c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+        resolve(c.toDataURL('image/jpeg', 0.7));
+      } catch (e) {
+        resolve(null); // tainted canvas or decode issue → fallback
+      }
+      v.removeAttribute('src');
+      v.load();
+    }
+    v.addEventListener('seeked', finish);
+    v.addEventListener('loadeddata', () => {
+      try { v.currentTime = 0.1; } catch (e) { finish(); }
+    });
+    v.addEventListener('error', () => { done = true; resolve(null); });
+    setTimeout(finish, 3000); // don't block the flow forever
+    v.src = url;
+    v.load();
+  });
+}
+
+// Small video thumbnail markup: real image when we captured a frame,
+// otherwise a <video> pinned to t=0.1 so Safari shows something.
+function videoThumbHtml(st, playSize) {
+  const inner = st.videoThumb
+    ? `<img src="${st.videoThumb}" alt="Walkthrough video">`
+    : `<video src="${st.videoUrl}#t=0.1" muted playsinline preload="metadata"></video>`;
+  return `<span class="sc-thumb">${inner}
+      <span class="mini-play"><svg width="${playSize || 9}" height="${playSize || 9}" viewBox="0 0 24 24" fill="#F9F5F1"><path d="M8 5.5v13l11-6.5z"/></svg></span>
+      <span class="mini-dur">0:07</span>
+    </span>`;
 }
 
 // Upload in the background the moment the worker confirms a photo/video,
@@ -1112,10 +1175,7 @@ function renderHome() {
         Completed</span>`;
       extra = `<div class="sc-thumbs">
           <span class="sc-thumb"><img src="${st.photoUrl}" alt="${meta.name} photo"></span>
-          <span class="sc-thumb"><video src="${st.videoUrl}" muted playsinline preload="metadata"></video>
-            <span class="mini-play"><svg width="9" height="9" viewBox="0 0 24 24" fill="#F9F5F1"><path d="M8 5.5v13l11-6.5z"/></svg></span>
-            <span class="mini-dur">0:07</span>
-          </span>
+          ${videoThumbHtml(st, 9)}
         </div>`;
     } else if (st.status === 'in_progress') {
       statusHtml = `<span class="sc-status">
@@ -1469,15 +1529,17 @@ function discardPendingVideo() {
   if (state.pendingVideo) { URL.revokeObjectURL(state.pendingVideo.url); state.pendingVideo = null; }
 }
 
-function useVideo() {
+async function useVideo() {
   const st = state.sets[state.currentSetId];
   if (st.videoUrl && st.videoUrl.startsWith('blob:')) URL.revokeObjectURL(st.videoUrl);
   st.videoBlob = state.pendingVideo.blob;
   st.videoUrl = state.pendingVideo.url;
   st.videoPath = null;
+  st.videoThumb = null;
   state.pendingVideo = null;
   st.status = 'completed';
   queueUpload(state.currentSetId, 'video'); // background upload to storage
+  st.videoThumb = await makeVideoThumb(st.videoUrl); // first frame (≤3s)
   showSetComplete();
 }
 
@@ -1490,10 +1552,7 @@ function showSetComplete() {
   document.getElementById('setCompleteTitle').textContent = `${meta.name} complete`;
   document.getElementById('setCompleteThumbs').innerHTML = `
     <span class="sc-thumb"><img src="${st.photoUrl}" alt="${meta.name} photo"></span>
-    <span class="sc-thumb"><video src="${st.videoUrl}" muted playsinline preload="metadata"></video>
-      <span class="mini-play"><svg width="11" height="11" viewBox="0 0 24 24" fill="#F9F5F1"><path d="M8 5.5v13l11-6.5z"/></svg></span>
-      <span class="mini-dur">0:07</span>
-    </span>`;
+    ${videoThumbHtml(st, 11)}`;
   showScreen('screen-set-complete');
 }
 
@@ -1568,10 +1627,7 @@ function goReview() {
       </div>
       <div class="sc-thumbs">
         <span class="sc-thumb"><img src="${st.photoUrl}" alt="${meta.name} photo"></span>
-        <span class="sc-thumb"><video src="${st.videoUrl}" muted playsinline preload="metadata"></video>
-          <span class="mini-play"><svg width="9" height="9" viewBox="0 0 24 24" fill="#F9F5F1"><path d="M8 5.5v13l11-6.5z"/></svg></span>
-          <span class="mini-dur">0:07</span>
-        </span>
+        ${videoThumbHtml(st, 9)}
       </div>`;
     list.appendChild(item);
   });

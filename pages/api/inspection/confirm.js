@@ -44,9 +44,16 @@ export default async function handler(req, res) {
     }
 
     const path = `${auth.orderId}/signature-${Date.now()}.png`;
-    const { error: upErr } = await supabase.storage
+    let { error: upErr } = await supabase.storage
       .from("inspections")
       .upload(path, buf, { contentType: "image/png" });
+    // Self-heal missing bucket (see upload-url.js)
+    if (upErr && /not exist|not found/i.test(upErr.message || "")) {
+      await supabase.storage.createBucket("inspections", { public: false });
+      ({ error: upErr } = await supabase.storage
+        .from("inspections")
+        .upload(path, buf, { contentType: "image/png" }));
+    }
     if (upErr) throw new Error(upErr.message);
 
     const { error } = await supabase.from("inspections").upsert(

@@ -732,6 +732,7 @@
     document.getElementById('successDeadline').textContent = ROOMO_INSPECTION.inspectionDeadline;
     document.getElementById('printedName').value = ROOMO_INSPECTION.customerName;
     renderSets();
+    enhanceVideoThumbs();
     checkFormValid();
   }
 
@@ -769,13 +770,65 @@
             ${photoInner}
             <span class="tag">Photo</span>
           </button>
-          <button type="button" class="media-thumb" aria-label="Play ${set.name} walkthrough video" onclick="openVideoModal('${set.id}')">
+          <button type="button" class="media-thumb" data-vthumb="${set.id}" aria-label="Play ${set.name} walkthrough video" onclick="openVideoModal('${set.id}')">
             ${videoInner}
             <span class="tag">Walkthrough</span>
             <span class="duration">${set.videoDuration || '0:07'}</span>
           </button>
         </div>`;
       container.appendChild(card);
+    });
+  }
+
+  /* ---------- first-frame video thumbnails ----------
+     iOS Safari won't paint a <video>'s first frame by itself, so grab
+     frame 0 onto a canvas and swap it in as a real <img>. */
+  function makeVideoThumb(url) {
+    return new Promise(resolve => {
+      const v = document.createElement('video');
+      v.muted = true;
+      v.playsInline = true;
+      v.preload = 'auto';
+      v.crossOrigin = 'anonymous';
+      let done = false;
+      function finish() {
+        if (done) return;
+        done = true;
+        try {
+          const w = v.videoWidth, h = v.videoHeight;
+          if (!w || !h) return resolve(null);
+          const scale = Math.min(1, 480 / w);
+          const c = document.createElement('canvas');
+          c.width = Math.round(w * scale);
+          c.height = Math.round(h * scale);
+          c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+          resolve(c.toDataURL('image/jpeg', 0.7));
+        } catch (e) {
+          resolve(null);
+        }
+        v.removeAttribute('src');
+        v.load();
+      }
+      v.addEventListener('seeked', finish);
+      v.addEventListener('loadeddata', () => { try { v.currentTime = 0.1; } catch (e) { finish(); } });
+      v.addEventListener('error', () => { done = true; resolve(null); });
+      setTimeout(finish, 3000);
+      v.src = url;
+      v.load();
+    });
+  }
+
+  function enhanceVideoThumbs() {
+    ROOMO_INSPECTION.sets.forEach(set => {
+      if (!set.videoUrl || set.videoPoster) return;
+      makeVideoThumb(set.videoUrl).then(t => {
+        if (!t) return;
+        const btn = document.querySelector(`.media-thumb[data-vthumb="${set.id}"]`);
+        if (!btn) return;
+        const ph = btn.querySelector('.ph');
+        if (ph) ph.outerHTML = `<img src="${t}" alt="${set.name} walkthrough video">`;
+        set.videoPoster = t; // reuse as the modal poster too
+      });
     });
   }
 
