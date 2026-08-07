@@ -212,21 +212,21 @@
     living: {
       name: 'Living Room',
       variants: [
-        { key: 'ws', dot: '#efe9dc', title: '米白沙发', file: function (i) { return 'WS/ws' + pad(i, 2) + '.webp'; } },
-        { key: 'rs', dot: '#722f37', title: '酒红沙发', file: function (i) { return 'WS/RS/rs' + pad(i, 4) + '.webp'; } }
+        { key: 'ws', dot: '#efe9dc', title: '米白沙发', file: function (i) { return '/staging-sample/WS/ws' + pad(i, 2) + '.webp'; } },
+        { key: 'rs', dot: '#722f37', title: '酒红沙发', file: function (i) { return '/staging-sample/WS/RS/rs' + pad(i, 4) + '.webp'; } }
       ]
     },
     kitchen: {
       name: 'Kitchen & Dining',
       variants: [
-        { key: 'ki', label: 'Island',    file: function (i) { return 'KI/ki' + pad(i, 4) + '.webp'; } },
-        { key: 'kn', label: 'No Island', file: function (i) { return 'KitchenNI/kn' + pad(i, 4) + '.webp'; } }
+        { key: 'ki', label: 'Island',    file: function (i) { return '/staging-sample/KI/ki' + pad(i, 4) + '.webp'; } },
+        { key: 'kn', label: 'No Island', file: function (i) { return '/staging-sample/KitchenNI/kn' + pad(i, 4) + '.webp'; } }
       ]
     },
     bedroom: {
       name: 'Bedroom',
       variants: [
-        { key: 'br', file: function (i) { return 'bedroom/br' + pad(i, 4) + '.webp'; } }
+        { key: 'br', file: function (i) { return '/staging-sample/bedroom/br' + pad(i, 4) + '.webp'; } }
       ]
     }
   };
