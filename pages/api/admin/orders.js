@@ -63,7 +63,9 @@ export default async function handler(req, res) {
     // ---- Build the data query ----
     let query = supabase
       .from("orders")
-      .select("*, order_items(*), payments(*), customers!inner(*)");
+      .select(
+        "*, order_items(*), payments(*), customers!inner(*), inspections(status, submitted_at, email_sent_at, confirmed_at)"
+      );
 
     query = applyStatusFilter(query);
 
@@ -153,6 +155,18 @@ export default async function handler(req, res) {
       subscriptionEndsAt: o.subscription_ends_at,
       stripeSubscriptionId: o.stripe_subscription_id,
       returnDate: o.return_date,
+      // Virtual inspection progress (one row per order, if any)
+      inspection: (() => {
+        const insp = Array.isArray(o.inspections) ? o.inspections[0] : o.inspections;
+        return insp
+          ? {
+              status: insp.status,
+              submittedAt: insp.submitted_at,
+              emailSentAt: insp.email_sent_at,
+              confirmedAt: insp.confirmed_at,
+            }
+          : null;
+      })(),
       customer: o.customers
         ? {
             name: o.customers.name,

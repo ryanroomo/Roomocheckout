@@ -1378,7 +1378,7 @@ function renderOrdersTable() {
       <td style="font-family:monospace;font-size:13px;color:var(--text-secondary)">${shortId(o.id)}</td>
       <td style="font-weight:600">${name}</td>
       <td style="color:var(--text-secondary)">${email}</td>
-      <td><span class="badge ${statusBadgeClass(o.status)}">${statusLabel(o.status)}</span>${refundRequestBadge(o)}</td>
+      <td><span class="badge ${statusBadgeClass(o.status)}">${statusLabel(o.status)}</span>${refundRequestBadge(o)}${inspectionBadge(o)}</td>
       <td style="color:var(--text-secondary)">${formatDate(o.deliveryDate)}</td>
       <td>${escapeHtml(items)}</td>
       <td style="font-weight:600">${formatCurrency(o.rentalMonthlyCents)}</td>
@@ -1575,6 +1575,20 @@ function refundRequestBadge(o) {
     : '';
 }
 
+// Small check in the orders list once the worker has submitted the
+// virtual inspection (double check once the customer has signed).
+function inspectionBadge(o) {
+  const i = o.inspection;
+  if (!i) return '';
+  if (i.status === 'confirmed') {
+    return ' <span class="badge badge-green" title="Customer signed ' + formatDate(i.confirmedAt) + '">✓✓ Signed</span>';
+  }
+  if (i.status === 'submitted') {
+    return ' <span class="badge badge-green" title="Worker submitted inspection ' + formatDate(i.submittedAt) + '">✓ Inspected</span>';
+  }
+  return '';
+}
+
 // Cancel + fallback-refund buttons for the order detail row.
 function renderOrderActions(o) {
   const canCancel = ['pending', 'deposit_paid', 'authorized'].includes(o.status);
@@ -1616,7 +1630,25 @@ function renderOrderActions(o) {
   if (o.status === 'return_scheduled') {
     btns += `<button onclick="completeReturn('${o.id}')" style="padding:8px 20px;border-radius:8px;border:none;background:#4A7C59;color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;margin-left:8px">Complete return &amp; refund deposit</button>`;
   }
-  return btns ? `<div style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:16px;margin-top:8px;text-align:right">${btns}</div>` : '';
+
+  // Inspection progress line (worker → email → customer signature)
+  let inspLine = '';
+  if (o.inspection) {
+    const i = o.inspection;
+    const parts = [];
+    parts.push(i.submittedAt
+      ? '<span style="color:#2E7D32;font-weight:600">✓ Worker submitted ' + formatDate(i.submittedAt) + '</span>'
+      : '<span>○ Waiting for worker photos/videos</span>');
+    if (i.emailSentAt) parts.push('<span>✉ Email sent ' + formatDate(i.emailSentAt) + '</span>');
+    if (i.confirmedAt) {
+      parts.push('<span style="color:#2E7D32;font-weight:600">✓ Customer signed ' + formatDate(i.confirmedAt) + '</span>');
+    } else if (i.emailSentAt) {
+      parts.push('<span>○ Awaiting customer signature</span>');
+    }
+    inspLine = `<div style="float:left;font-size:12px;color:var(--text-secondary);line-height:2.6;text-align:left">${parts.join(' &nbsp;·&nbsp; ')}</div>`;
+  }
+
+  return (btns || inspLine) ? `<div style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:16px;margin-top:8px;text-align:right">${inspLine}${btns}</div>` : '';
 }
 
 // Capture the pre-auth on delivery: charges the customer, starts the rental
