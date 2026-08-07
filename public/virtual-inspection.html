@@ -561,7 +561,7 @@
 
     <div class="deadline-card">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#865651" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-      <span>You have 48 hours to report any missing items, visible damage, or setup issues.<br><strong>Report issues by <span id="deadlineText"></span></strong></span>
+      <span>You have 48 hours to report any missing items, major damage, or assembly issues.<br><strong>Report issues by <span id="deadlineText"></span></strong></span>
     </div>
 
     <section style="border-top:none; padding-top:22px;">
@@ -583,13 +583,13 @@
 
     <section class="report">
       <h3>Something doesn't look right?</h3>
-      <p>Report a missing item, visible damage, or setup issue within 48 hours.</p>
+      <p>Report a missing item, major damage, or assembly issue within 48 hours.</p>
       <button type="button" class="btn-outline" onclick="reportIssue()">Report an issue</button>
     </section>
 
     <section class="statement">
       <p class="section-label">Confirmation Statement</p>
-      <p>I've reviewed the virtual inspection media for my order. I understand that I have <span class="deadline">48 hours</span> after the applicable delivery or move-in time to report any missing items, visible damage, or setup issues. If I do not report an issue within that period, the order will be considered received in good condition under Roomo's rental terms.</p>
+      <p>I've reviewed the virtual inspection media for my order. I understand that I have <span class="deadline">48 hours</span> after the applicable delivery or move-in time to check for any missing items, major damage, or assembly issues. If nothing is reported within that period, my order is considered complete and to have passed inspection under Roomo's rental terms.</p>
 
       <label class="agree">
         <input type="checkbox" id="agreeBox" onchange="checkFormValid()">
@@ -629,7 +629,7 @@
     </svg>
     <h2>Receipt confirmed</h2>
     <p>Your confirmation has been recorded.</p>
-    <div class="success-deadline">You can report delivery or setup issues until <strong id="successDeadline"></strong>.</div>
+    <div class="success-deadline">You can report any missing items or assembly issues until <strong id="successDeadline"></strong>.</div>
     <br>
     <a href="#" id="successReportLink" onclick="reportIssue(); return false;">Report an issue</a>
   </div>
