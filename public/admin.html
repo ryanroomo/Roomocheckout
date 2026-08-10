@@ -1608,6 +1608,9 @@ function renderOrderActions(o) {
   if (['deposit_paid', 'authorized', 'delivered', 'active'].includes(o.status)) {
     btns += `<button onclick="createWorkerLink('${o.id}', this)" style="padding:8px 20px;border-radius:8px;border:1.5px solid var(--text-secondary);background:transparent;color:var(--text);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;margin-left:8px">Create worker link</button>`;
   }
+  if (o.inspection && o.inspection.status !== 'pending') {
+    btns += `<button onclick="openInspectionArchive('${o.id}')" style="padding:8px 20px;border-radius:8px;border:1.5px solid var(--text-secondary);background:transparent;color:var(--text);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;margin-left:8px">View archive</button>`;
+  }
   if (['deposit_paid', 'authorized', 'delivered', 'active'].includes(o.status)) {
     btns += `<button onclick="sendInspection('${o.id}')" style="padding:8px 20px;border-radius:8px;border:none;background:#49372A;color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;margin-left:8px">Send inspection</button>`;
   }
@@ -1707,6 +1710,66 @@ async function createWorkerLink(orderId, btn) {
   } catch (e) {
     if (btn) { btn.textContent = orig; btn.disabled = false; }
     alert('Could not create the worker link: ' + e.message);
+  }
+}
+
+// ─── Inspection archive modal: every photo/video/signature for one order ───
+async function openInspectionArchive(orderId) {
+  var ov = document.getElementById('inspArchiveModal');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'inspArchiveModal';
+    ov.className = 'day-modal-overlay';
+    ov.innerHTML = '<div class="day-modal" style="max-width:720px">' +
+      '<div class="day-modal-header"><div class="day-modal-title">Inspection Archive</div>' +
+      '<button class="day-modal-close" onclick="document.getElementById(\'inspArchiveModal\').classList.remove(\'active\')">' +
+      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+      '</button></div><div class="day-modal-body" id="inspArchiveBody"></div></div>';
+    document.body.appendChild(ov);
+    ov.addEventListener('click', function(e){ if (e.target === ov) ov.classList.remove('active'); });
+  }
+  var body = document.getElementById('inspArchiveBody');
+  body.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-secondary)">Loading…</div>';
+  ov.classList.add('active');
+
+  try {
+    var r = await fetch('/api/admin/inspection-archive?orderId=' + encodeURIComponent(orderId), {
+      headers: { 'Authorization': 'Bearer ' + getPassword() }
+    });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Failed to load');
+
+    var fmt = function(iso){ return iso ? new Date(iso).toLocaleString('en-US', { month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit' }) : null; };
+    var html = '<div style="font-size:13px;color:var(--text-secondary);line-height:1.9;margin-bottom:18px;background:var(--bg);border-radius:10px;padding:12px 16px">';
+    html += 'Status: <strong style="color:var(--text);text-transform:capitalize">' + escapeHtml(d.status) + '</strong>';
+    if (d.submittedAt) html += '<br>✓ Worker submitted — ' + fmt(d.submittedAt);
+    if (d.emailSentAt) html += '<br>✉ Inspection email sent — ' + fmt(d.emailSentAt);
+    if (d.confirmedAt) html += '<br>✓ Customer confirmed — ' + fmt(d.confirmedAt) + (d.confirmedName ? ' — signed as <strong style="color:var(--text)">' + escapeHtml(d.confirmedName) + '</strong>' : '');
+    if (d.userAgent) html += '<br><span style="font-size:11px;color:var(--text-muted)">Device: ' + escapeHtml(d.userAgent) + '</span>';
+    html += '</div>';
+
+    (d.sets || []).forEach(function(s){
+      html += '<div style="margin-bottom:18px"><div style="font-weight:700;font-size:14px;margin-bottom:8px">' + escapeHtml(s.name) + '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+        (s.photoUrl
+          ? '<a href="' + s.photoUrl + '" target="_blank" title="Open full size"><img src="' + s.photoUrl + '" style="width:100%;border-radius:10px;border:1px solid var(--border);display:block"></a>'
+          : '<div style="display:flex;align-items:center;justify-content:center;border:1px dashed var(--border);border-radius:10px;color:var(--text-muted);font-size:12px;min-height:120px">No photo</div>') +
+        (s.videoUrl
+          ? '<video src="' + s.videoUrl + '" controls playsinline preload="metadata" style="width:100%;border-radius:10px;border:1px solid var(--border);background:#000"></video>'
+          : '<div style="display:flex;align-items:center;justify-content:center;border:1px dashed var(--border);border-radius:10px;color:var(--text-muted);font-size:12px;min-height:120px">No video</div>') +
+        '</div></div>';
+    });
+
+    if (d.signatureUrl) {
+      html += '<div><div style="font-weight:700;font-size:14px;margin-bottom:8px">Customer signature</div>' +
+        '<a href="' + d.signatureUrl + '" target="_blank" title="Open full size"><img src="' + d.signatureUrl + '" style="max-width:340px;width:100%;background:#fff;border:1px solid var(--border);border-radius:10px;display:block;padding:8px"></a></div>';
+    }
+    if (!(d.sets || []).length && !d.signatureUrl) {
+      html += '<div style="color:var(--text-secondary);font-size:13px">Nothing uploaded yet for this order.</div>';
+    }
+    body.innerHTML = html;
+  } catch (e) {
+    body.innerHTML = '<div style="color:var(--red);font-size:13px;padding:12px">Could not load the archive: ' + escapeHtml(e.message) + '</div>';
   }
 }
 
