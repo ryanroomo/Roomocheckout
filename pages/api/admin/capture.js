@@ -114,27 +114,31 @@ export default async function handler(req, res) {
         promoCoupon = c || null;
       }
 
-      let promoCouponId; // Stripe coupon id to attach to the subscription (intro %)
+      let promoCouponId; // Stripe coupon id to attach to the subscription (% off)
       if (
         promoCoupon &&
         promoCoupon.promo_type === "building_lease" &&
         maxMonths < (promoCoupon.free_month_min_lease || 12) &&
-        (promoCoupon.intro_discount_months || 0) > 1 &&
         Number(promoCoupon.intro_discount_pct) > 0
       ) {
-        const introSubMonths = Math.min(
-          (promoCoupon.intro_discount_months || 0) - 1,
-          remainingMonths
-        );
-        if (introSubMonths > 0) {
-          const stripeCoupon = await stripe.coupons.create({
-            percent_off: Number(promoCoupon.intro_discount_pct),
-            duration: "repeating",
-            duration_in_months: introSubMonths,
-            name: `${order.coupon_code} intro ${promoCoupon.intro_discount_pct}%`,
-            metadata: { order_id: order.id, code: order.coupon_code },
-          });
-          promoCouponId = stripeCoupon.id;
+        // intro_discount_months: a positive N = first N rental months; null/0 =
+        // EVERY month of the lease (e.g. an employee "20% off per month" code).
+        const im = Number(promoCoupon.intro_discount_months) || 0;
+        const fullTerm = im <= 0;
+        if (fullTerm || im > 1) {
+          const introSubMonths = fullTerm
+            ? remainingMonths
+            : Math.min(im - 1, remainingMonths);
+          if (introSubMonths > 0) {
+            const stripeCoupon = await stripe.coupons.create({
+              percent_off: Number(promoCoupon.intro_discount_pct),
+              duration: "repeating",
+              duration_in_months: introSubMonths,
+              name: `${order.coupon_code} ${promoCoupon.intro_discount_pct}%`,
+              metadata: { order_id: order.id, code: order.coupon_code },
+            });
+            promoCouponId = stripeCoupon.id;
+          }
         }
       }
 

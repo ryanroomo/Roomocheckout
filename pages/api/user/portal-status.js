@@ -324,8 +324,8 @@ export default async function handler(req, res) {
           .eq("code", order.coupon_code)
           .maybeSingle();
         const pct = Number(coupon?.intro_discount_pct) || 0;
-        const introMonths = Number(coupon?.intro_discount_months) || 0;
-        if (pct > 0 && nextMonthIndex <= introMonths) {
+        const introMonths = Number(coupon?.intro_discount_months) || 0; // 0/null = every month
+        if (pct > 0 && (introMonths <= 0 || nextMonthIndex <= introMonths)) {
           nextChargeCents = Math.round(monthlyCents * (1 - pct / 100));
         }
       }

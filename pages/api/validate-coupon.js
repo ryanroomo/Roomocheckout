@@ -76,15 +76,18 @@ export default async function handler(req, res) {
         });
       }
       const pct = Number(coupon.intro_discount_pct) || 0;
-      const im = coupon.intro_discount_months || 0;
+      const im = Number(coupon.intro_discount_months) || 0; // 0/null = every month
+      const fullTerm = im <= 0;
       return res.status(200).json({
         valid: true,
         code: coupon.code,
         discountType: "percentage",
         discountValue: pct,
         discountAmount: Math.round(total * (pct / 100)), // per-month saving on rent
-        appliesTo: "first_n_months",
-        description: `${pct}% off your first ${im} month${im > 1 ? "s" : ""}`,
+        appliesTo: fullTerm ? "every_month" : "first_n_months",
+        description: fullTerm
+          ? `${pct}% off every month`
+          : `${pct}% off your first ${im} month${im > 1 ? "s" : ""}`,
         introMonths: im,
       });
     }

@@ -1499,15 +1499,18 @@ function nextCharge(o) {
       if (!nx) {
         return { label: 'Monthly rent', amountCents: o.rentalMonthlyCents, when: 'Scheduled by Stripe', whenDate: null };
       }
-      const introN = o.introDiscountMonths || 0;       // intro covers rental months 1..N
+      const introN = o.introDiscountMonths || 0;       // >0 = first N rental months; 0/null = every month
       const perMonthDiscount = o.discountCents || 0;    // per-month $ off (same value Stripe applies)
       const rentalMonth = nx.cycle + 1;                 // subscription cycle 1 = rental month 2
       let amount = o.rentalMonthlyCents;
       let note = '';
-      if (introN > 0 && perMonthDiscount > 0 && rentalMonth <= introN) {
+      const fullTermOff = introN <= 0 && perMonthDiscount > 0;
+      if (perMonthDiscount > 0 && (fullTermOff || rentalMonth <= introN)) {
         amount = Math.max(0, o.rentalMonthlyCents - perMonthDiscount);
         const pct = o.introDiscountPct || Math.round((perMonthDiscount / o.rentalMonthlyCents) * 100);
-        note = `Intro ${pct}% off — rental month ${rentalMonth} of ${introN} (full price ${formatCurrency(o.rentalMonthlyCents)})`;
+        note = fullTermOff
+          ? `${pct}% off every month`
+          : `Intro ${pct}% off — rental month ${rentalMonth} of ${introN} (full price ${formatCurrency(o.rentalMonthlyCents)})`;
       }
       return { label: 'Monthly rent', amountCents: amount, when: '', whenDate: nx.date.toISOString(), note };
     }
