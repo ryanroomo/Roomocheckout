@@ -240,6 +240,8 @@ function trackEvent(name: string, params?: Record<string, any>) {
             fbq("track", "InitiateCheckout", { currency: "USD" })
         } else if (name === "newsletter_signup") {
             fbq("track", "Lead", { content_name: "newsletter" })
+        } else if (name === "price_lock_signup") {
+            fbq("track", "Lead", { content_name: "price_lock" })
         }
     }
 }
@@ -921,6 +923,54 @@ function StepZip({
     const [zip, setZip] = useState("")
     const [status, setStatus] = useState<"idle" | "nyc" | "jc" | "no">("idle")
 
+    // "No ZIP yet" price-lock lead capture
+    const [lockOpen, setLockOpen] = useState(false)
+    const [lockEmail, setLockEmail] = useState("")
+    const [lockMonth, setLockMonth] = useState("")
+    const [lockStatus, setLockStatus] = useState<
+        "idle" | "sending" | "done" | "error"
+    >("idle")
+    const [lockedUntil, setLockedUntil] = useState("")
+
+    const monthOptions = (() => {
+        const opts: { v: string; l: string }[] = []
+        const now = new Date()
+        for (let i = 0; i < 8; i++) {
+            const m = new Date(now.getFullYear(), now.getMonth() + i, 1)
+            opts.push({
+                v: m.getFullYear() + "-" + String(m.getMonth() + 1).padStart(2, "0"),
+                l: m.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+            })
+        }
+        return opts
+    })()
+
+    const submitLock = () => {
+        const em = lockEmail.trim()
+        if (!em || em.indexOf("@") < 1 || lockStatus === "sending") return
+        setLockStatus("sending")
+        trackEvent("price_lock_signup", { move_month: lockMonth || undefined })
+        fetch("https://roomocheckout.vercel.app/api/price-lock", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                email: em,
+                moveMonth: lockMonth || null,
+                source: "zip_step",
+            }),
+        })
+            .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
+            .then(({ ok, d }) => {
+                if (!ok) throw new Error((d && d.error) || "fail")
+                setLockedUntil((d && d.lockedUntil) || "")
+                setLockStatus("done")
+            })
+            .catch(() => {
+                setLockStatus("error")
+                setTimeout(() => setLockStatus("idle"), 2500)
+            })
+    }
+
     const handleCheck = () => {
         const z = zip.trim()
         trackEvent("check_zipcode", { zip: z })
@@ -1102,6 +1152,180 @@ function StepZip({
                         Sorry, we don't deliver to this area yet. We're
                         expanding soon — stay tuned!
                     </span>
+                </div>
+            )}
+
+            {/* No ZIP yet? Lock today's price instead (hidden once a valid ZIP checks out) */}
+            {status !== "nyc" && status !== "jc" && (
+                <div style={{ marginTop: 2, marginBottom: 4 }}>
+                    {lockStatus === "done" ? (
+                        <div
+                            style={{
+                                padding: "14px 16px",
+                                background: C.greenLight,
+                                borderRadius: 10,
+                            }}
+                        >
+                            <div
+                                style={{
+                                    fontFamily: font,
+                                    fontSize: 13,
+                                    fontWeight: 700,
+                                    color: C.green,
+                                    marginBottom: 3,
+                                }}
+                            >
+                                {"\u2713"} Your price is locked
+                            </div>
+                            <div
+                                style={{
+                                    fontFamily: font,
+                                    fontSize: 12.5,
+                                    color: C.brownMuted,
+                                    lineHeight: 1.5,
+                                }}
+                            >
+                                Today's pricing is saved for you
+                                {lockedUntil ? " until " + lockedUntil : " for 30 days"}.
+                                Come back anytime before then — no commitment.
+                            </div>
+                        </div>
+                    ) : !lockOpen ? (
+                        <button
+                            onClick={() => setLockOpen(true)}
+                            style={{
+                                background: "none",
+                                border: "none",
+                                padding: "8px 0",
+                                fontFamily: font,
+                                fontSize: 13,
+                                color: C.brownMuted,
+                                textDecoration: "underline",
+                                cursor: "pointer",
+                            }}
+                        >
+                            Moving to NYC and don't have your ZIP yet?
+                        </button>
+                    ) : (
+                        <div
+                            style={{
+                                padding: "14px 16px",
+                                background: C.cream,
+                                borderRadius: 10,
+                            }}
+                        >
+                            <div
+                                style={{
+                                    fontFamily: font,
+                                    fontSize: 13,
+                                    fontWeight: 700,
+                                    color: C.brown,
+                                    marginBottom: 4,
+                                }}
+                            >
+                                No ZIP yet? No problem.
+                            </div>
+                            <div
+                                style={{
+                                    fontFamily: font,
+                                    fontSize: 12.5,
+                                    color: C.brownMuted,
+                                    lineHeight: 1.5,
+                                    marginBottom: 10,
+                                }}
+                            >
+                                Leave your email and we'll lock today's price
+                                for you for 30 days — no commitment.
+                            </div>
+                            <input
+                                type="email"
+                                value={lockEmail}
+                                onChange={(e) => setLockEmail(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") submitLock()
+                                }}
+                                placeholder="you@email.com"
+                                style={{
+                                    width: "100%",
+                                    padding: "11px 14px",
+                                    borderRadius: 10,
+                                    border: `1.5px solid ${C.border}`,
+                                    fontFamily: font,
+                                    fontSize: 14,
+                                    color: C.brown,
+                                    outline: "none",
+                                    background: "#fff",
+                                    boxSizing: "border-box" as const,
+                                    marginBottom: 8,
+                                }}
+                            />
+                            <select
+                                value={lockMonth}
+                                onChange={(e) => setLockMonth(e.target.value)}
+                                style={{
+                                    width: "100%",
+                                    padding: "11px 14px",
+                                    borderRadius: 10,
+                                    border: `1.5px solid ${C.border}`,
+                                    fontFamily: font,
+                                    fontSize: 13,
+                                    color: lockMonth ? C.brown : C.muted,
+                                    outline: "none",
+                                    background: "#fff",
+                                    boxSizing: "border-box" as const,
+                                    marginBottom: 10,
+                                    appearance: "none" as const,
+                                }}
+                            >
+                                <option value="">
+                                    When are you moving? (optional)
+                                </option>
+                                {monthOptions.map((o) => (
+                                    <option key={o.v} value={o.v}>
+                                        {o.l}
+                                    </option>
+                                ))}
+                            </select>
+                            <button
+                                onClick={submitLock}
+                                style={{
+                                    width: "100%",
+                                    padding: "12px 0",
+                                    borderRadius: 999,
+                                    border: "none",
+                                    background:
+                                        lockEmail.indexOf("@") > 0
+                                            ? C.brown
+                                            : C.muted,
+                                    color: "#fff",
+                                    fontFamily: font,
+                                    fontSize: 13,
+                                    fontWeight: 700,
+                                    cursor:
+                                        lockEmail.indexOf("@") > 0
+                                            ? "pointer"
+                                            : "not-allowed",
+                                    letterSpacing: "0.02em",
+                                }}
+                            >
+                                {lockStatus === "sending"
+                                    ? "Locking\u2026"
+                                    : "Lock my price"}
+                            </button>
+                            {lockStatus === "error" && (
+                                <div
+                                    style={{
+                                        fontFamily: font,
+                                        fontSize: 12,
+                                        color: C.red,
+                                        marginTop: 8,
+                                    }}
+                                >
+                                    Something went wrong — please try again.
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             )}
 
