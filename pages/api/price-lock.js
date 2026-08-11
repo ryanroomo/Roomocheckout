@@ -1,4 +1,5 @@
 import { supabase } from "../../lib/supabase";
+import { sendPriceLockEmail } from "../../lib/email";
 
 /**
  * POST /api/price-lock   (public — called from the Framer cart's ZIP step)
@@ -47,6 +48,17 @@ export default async function handler(req, res) {
       day: "numeric",
       year: "numeric",
     });
+
+    // Welcome email — best effort: a mail hiccup must never make the
+    // lock look failed (the lead is already saved).
+    try {
+      await sendPriceLockEmail({
+        email: email.toLowerCase().trim(),
+        lockedUntilText,
+      });
+    } catch (mailErr) {
+      console.error("price-lock email failed (lead still saved):", mailErr);
+    }
 
     return res.status(200).json({ ok: true, lockedUntil: lockedUntilText });
   } catch (err) {

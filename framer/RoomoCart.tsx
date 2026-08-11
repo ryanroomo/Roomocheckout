@@ -1187,7 +1187,7 @@ function StepZip({
                             >
                                 Today's pricing is saved for you
                                 {lockedUntil ? " until " + lockedUntil : " for 30 days"}.
-                                Come back anytime before then — no commitment.
+                                We'll be ready whenever you are.
                             </div>
                         </div>
                     ) : !lockOpen ? (
