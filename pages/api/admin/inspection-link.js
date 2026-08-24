@@ -31,7 +31,7 @@ export default async function handler(req, res) {
   try {
     const { orderId, role = "worker" } = req.body || {};
     if (!orderId) return res.status(400).json({ error: "orderId is required" });
-    if (!["worker", "customer"].includes(role)) return res.status(400).json({ error: "Bad role" });
+    if (!["worker", "customer", "onsite"].includes(role)) return res.status(400).json({ error: "Bad role" });
 
     const { data: order, error } = await supabase
       .from("orders")
@@ -47,7 +47,8 @@ export default async function handler(req, res) {
 
     const token = signInspectionToken(orderId, role);
     const base = process.env.PUBLIC_BASE_URL || "https://checkout.roomonyc.com";
-    const page = role === "worker" ? "worker-inspection.html" : "virtual-inspection.html";
+    // onsite = combined capture + on-the-spot sign, starts on the worker capture page
+    const page = role === "customer" ? "virtual-inspection.html" : "worker-inspection.html";
     const url = `${base}/${page}?token=${encodeURIComponent(token)}`;
 
     return res.status(200).json({ url, role });

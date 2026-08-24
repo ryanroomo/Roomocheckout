@@ -111,7 +111,7 @@ export default async function handler(req, res) {
       role: auth.role,
       orderId: order.id,
       orderShort: String(order.id).split("-")[0],
-      customerName: auth.role === "customer" ? order.customers?.name || "" : undefined,
+      customerName: ["customer", "onsite"].includes(auth.role) ? order.customers?.name || "" : undefined,
       deliveryAddress: address,
       deliveryDate: fmtDate(order.delivery_date),
       deliverySlot: order.delivery_slot || "",

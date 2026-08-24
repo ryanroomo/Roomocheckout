@@ -991,7 +991,8 @@ async function init() {
       orderId: d.orderShort,
       deliveryAddress: d.deliveryAddress,
       deliveryDate: d.deliveryDate + (d.deliverySlot ? ' · ' + d.deliverySlot : ''),
-      sets: d.sets
+      sets: d.sets,
+      role: d.role
     };
     initStateSets();
     // Hydrate media the crew already uploaded (e.g. link reopened)
@@ -1669,6 +1670,23 @@ async function submitInspection() {
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Submit failed');
+    }
+    // On-site delivery: photos/video saved — now hand the device to the
+    // customer to sign on the spot (same token works on the sign page).
+    if (ROOMO_ORDER.role === 'onsite') {
+      const sc = document.getElementById('screen-success');
+      const state = sc.querySelector('.center-state');
+      if (state) {
+        state.querySelector('h2').textContent = 'Photos & video saved';
+        state.querySelector('p').textContent = 'Now hand the device to the customer to review and sign.';
+      }
+      const footer = sc.querySelector('.action-footer');
+      if (footer) {
+        footer.innerHTML =
+          '<a class="btn-primary" style="text-decoration:none;text-align:center;display:block" ' +
+          'href="/virtual-inspection.html?token=' + encodeURIComponent(WORKER_TOKEN) + '">' +
+          'Hand to customer to sign &rarr;</a>';
+      }
     }
     showScreen('screen-success');
   } catch (err) {

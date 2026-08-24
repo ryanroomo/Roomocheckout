@@ -558,7 +558,7 @@
       <p>Our team photographed and recorded each furniture set after installation. Review the media below, then confirm your delivery.</p>
     </div>
 
-    <div class="deadline-card">
+    <div class="deadline-card" id="deadlineCard">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#865651" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
       <span>After your delivery is completed, you have a <strong>48-hour window</strong> to review everything and report any missing items, major damage, or assembly issues.</span>
     </div>
@@ -580,7 +580,7 @@
       <div id="setsContainer"></div>
     </section>
 
-    <section class="report">
+    <section class="report" id="reportSection">
       <h3>Something doesn't look right?</h3>
       <p>Report a missing item, major damage, or assembly issue within 48 hours.</p>
       <button type="button" class="btn-outline" onclick="reportIssue()">Report an issue</button>
@@ -588,7 +588,7 @@
 
     <section class="statement">
       <p class="section-label">Confirmation Statement</p>
-      <p>I've reviewed the virtual inspection media for my order. I understand that I have a <span class="deadline">48-hour window</span> after my delivery is completed to check for any missing items, major damage, or assembly issues. If nothing is reported within that period, my order is considered complete and to have passed inspection under Roomo's rental terms.</p>
+      <p id="stmtText">I've reviewed the virtual inspection media for my order. I understand that I have a <span class="deadline">48-hour window</span> after my delivery is completed to check for any missing items, major damage, or assembly issues. If nothing is reported within that period, my order is considered complete and to have passed inspection under Roomo's rental terms.</p>
 
       <label class="agree">
         <input type="checkbox" id="agreeBox" onchange="checkFormValid()">
@@ -637,7 +637,7 @@
     <h2>Delivery confirmed</h2>
     <p>Thank you for confirming — your order is now officially underway, and we'll finalize your payment as scheduled. Nothing more you need to do.<br>We hope your new place already feels like home.</p>
     <p style="font-family:'Manrope',sans-serif; font-size:17px; font-weight:700; color:var(--brown-accent); margin:0 0 22px;">Welcome home.</p>
-    <div class="success-deadline">You can report any missing items or assembly issues within <strong>48 hours</strong> of your delivery being completed.</div>
+    <div class="success-deadline" id="successDeadline">You can report any missing items or assembly issues within <strong>48 hours</strong> of your delivery being completed.</div>
     <br>
     <a href="#" id="successReportLink" onclick="reportIssue(); return false;">Report an issue</a>
   </div>
@@ -680,6 +680,22 @@
     ]
   };
 
+  /* ---------- on-site delivery mode ----------
+     Customer signs on the spot on the crew's device: no 48-hour remote
+     review window, no "report later" — accepting is immediate. Strip the
+     48h language and reword the sign-off to on-site acceptance. */
+  function applyOnsiteMode() {
+    ['deadlineCard', 'reportSection', 'successDeadline', 'successReportLink']
+      .forEach(function (id) { var el = document.getElementById(id); if (el) el.remove(); });
+    var stmt = document.getElementById('stmtText');
+    if (stmt) stmt.textContent =
+      "I confirm my order was delivered and set up today, and that I received it in good condition. My order is considered complete and to have passed inspection under Roomo's rental terms.";
+    var h1 = document.querySelector('.intro h1');
+    if (h1) h1.textContent = 'Delivery sign-off';
+    var p = document.querySelector('.intro p');
+    if (p) p.textContent = 'Please confirm you received your order today and everything looks good, then sign below.';
+  }
+
   /* ---------- load order + media, then render ---------- */
   async function init() {
     if (!DEMO_MODE) {
@@ -708,6 +724,7 @@
           rentalTermsUrl: 'https://www.roomonyc.com/rental-contract',
           supportUrl: 'mailto:hello@roomonyc.com?subject=' + encodeURIComponent('Issue with order #' + d.orderShort),
           illustrationUrl: '',
+          role: d.role,
           sets: (d.sets || []).map(s => ({
             id: s.id,
             name: s.name,
@@ -717,6 +734,7 @@
             videoDuration: '0:07'
           }))
         };
+        if (d.role === 'onsite') applyOnsiteMode();
       } catch (e) {
         console.log('inspection load failed', e);
         showFatal("This link isn't valid anymore, or your inspection couldn't be loaded. Please contact us at hello@roomonyc.com and we'll sort it out.");

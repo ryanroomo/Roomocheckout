@@ -34,7 +34,7 @@ export default async function handler(req, res) {
 
   const { token, setType, mediaType, contentType } = req.body || {};
   const auth = verifyInspectionToken(token);
-  if (!auth || auth.role !== "worker") {
+  if (!auth || !["worker", "onsite"].includes(auth.role)) {
     return res.status(401).json({ error: "This link is invalid or has expired." });
   }
   if (!VALID_SETS.includes(setType)) return res.status(400).json({ error: "Bad setType" });

@@ -1610,6 +1610,7 @@ function renderOrderActions(o) {
   // on-site confirmation form directly.
   if (['deposit_paid', 'authorized', 'delivered', 'active'].includes(o.status)) {
     btns += `<button onclick="createWorkerLink('${o.id}', this)" style="padding:8px 20px;border-radius:8px;border:1.5px solid var(--text-secondary);background:transparent;color:var(--text);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;margin-left:8px">Create worker link</button>`;
+    btns += `<button onclick="createWorkerLink('${o.id}', this, 'onsite')" style="padding:8px 20px;border-radius:8px;border:1.5px solid #865651;background:transparent;color:#865651;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;margin-left:8px" title="One link for on-site delivery: crew shoots photos/video, then the customer signs on the spot. No email, no 48h window.">On-site link</button>`;
   }
   if (o.inspection && o.inspection.status !== 'pending') {
     btns += `<button onclick="openInspectionArchive('${o.id}')" style="padding:8px 20px;border-radius:8px;border:1.5px solid var(--text-secondary);background:transparent;color:var(--text);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;margin-left:8px">View archive</button>`;
@@ -1683,14 +1684,15 @@ async function captureOrder(orderId) {
 // Mint a signed worker inspection link for this order and copy it to the
 // clipboard. Send it manually (text/WhatsApp) to whichever crew is doing
 // this delivery — everything they shoot attaches to this order.
-async function createWorkerLink(orderId, btn) {
+async function createWorkerLink(orderId, btn, role) {
+  role = role || 'worker';
   var orig = btn ? btn.textContent : '';
   if (btn) { btn.textContent = '...'; btn.disabled = true; }
   try {
     var r = await fetch('/api/admin/inspection-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getPassword() },
-      body: JSON.stringify({ orderId: orderId, role: 'worker' })
+      body: JSON.stringify({ orderId: orderId, role: role })
     });
     var d = await r.json();
     if (!r.ok) throw new Error(d.error || 'Failed to create link');

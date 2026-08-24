@@ -27,7 +27,7 @@ export default async function handler(req, res) {
 
   const { token, printedName, signatureDataUrl } = req.body || {};
   const auth = verifyInspectionToken(token);
-  if (!auth || auth.role !== "customer") {
+  if (!auth || !["customer", "onsite"].includes(auth.role)) {
     return res.status(401).json({ error: "This link is invalid or has expired." });
   }
 
