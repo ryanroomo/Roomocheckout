@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
+  <meta name="color-scheme" content="light only">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>Roomo — Bed Assembly</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=League+Spartan:wght@400;500;600&display=swap');
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; padding: 0; height: 100%; background: #EDE8E2; }
+    body {
+      font-family: 'League Spartan', -apple-system, Arial, sans-serif;
+      color: #49372A;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    /* Top bar */
+    .bar {
+      position: sticky; top: 0; z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 22px;
+      background: #F9F5F1;
+      border-bottom: 1px solid #E1D8D0;
+      padding-top: calc(14px + env(safe-area-inset-top));
+    }
+    .bar .title { font-family: 'Manrope', Arial, sans-serif; font-weight: 800; font-size: 20px; letter-spacing: 0.5px; color: #49372A; }
+    .bar .brand { font-family: 'Manrope', Arial, sans-serif; font-weight: 800; font-size: 20px; letter-spacing: 1px; color: #865651; }
+
+    /* Layout */
+    .wrap { display: flex; flex-direction: column; min-height: 100%; }
+    .video-pane {
+      background: #F9F5F1;
+      padding: 16px;
+      border-bottom: 1px solid #E1D8D0;
+    }
+    .video-pane video {
+      width: 100%; height: auto; display: block;
+      border-radius: 14px; background: #000;
+      box-shadow: 0 4px 18px rgba(73,55,42,0.12);
+    }
+    .video-label {
+      font-family: 'Manrope', Arial, sans-serif; font-weight: 700;
+      font-size: 12px; letter-spacing: 1.2px; text-transform: uppercase;
+      color: #865651; margin: 0 0 10px 2px;
+    }
+    .sheet-pane { padding: 16px; }
+    .sheet-pane img {
+      width: 100%; height: auto; display: block;
+      border-radius: 12px; border: 1px solid #E1D8D0;
+      box-shadow: 0 4px 18px rgba(73,55,42,0.10);
+    }
+    .pdf-link {
+      display: inline-block; margin: 14px 2px 4px;
+      font-family: 'Manrope', Arial, sans-serif; font-weight: 700; font-size: 14px;
+      color: #F9F5F1; background: #49372A; text-decoration: none;
+      padding: 12px 22px; border-radius: 30px;
+    }
+    .hint { font-size: 13px; color: #816F68; margin: 8px 2px 0; }
+
+    /* Landscape / wide (iPad landscape): sheet left, video pinned right */
+    @media (min-width: 820px) and (orientation: landscape) {
+      .wrap { flex-direction: row; align-items: stretch; height: calc(100vh - 55px); }
+      .sheet-pane {
+        flex: 1.5; overflow-y: auto; -webkit-overflow-scrolling: touch;
+        border-right: 1px solid #E1D8D0;
+      }
+      .video-pane {
+        flex: 1; border-bottom: none;
+        position: sticky; top: 0; align-self: flex-start;
+        max-width: 46%;
+      }
+      .video-pane video { position: sticky; top: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="bar">
+    <span class="title">BED ASSEMBLY</span>
+    <span class="brand">ROOMO</span>
+  </div>
+
+  <div class="wrap">
+    <div class="video-pane">
+      <p class="video-label">Watch: full assembly</p>
+      <video autoplay loop muted playsinline controls
+             poster="bed-assembly-poster.jpg" preload="auto">
+        <source src="bed-assembly.mp4" type="video/mp4">
+        Your browser does not support the video.
+      </video>
+    </div>
+
+    <div class="sheet-pane">
+      <img src="bed-assembly-sheet.png" alt="Bed assembly instruction sheet" />
+      <a class="pdf-link" href="bed-assembly-instructions.pdf" target="_blank" rel="noopener">Open full PDF</a>
+      <p class="hint">Pinch to zoom the diagram. The video loops automatically.</p>
+    </div>
+  </div>
+
+  <script>
+    // Guarantee the loop keeps playing on iPad even after backgrounding
+    var v = document.querySelector('video');
+    function keepPlaying(){ if (v && v.paused) { v.play().catch(function(){}); } }
+    document.addEventListener('visibilitychange', function(){ if (!document.hidden) keepPlaying(); });
+    if (v) { v.addEventListener('ended', keepPlaying); }
+  </script>
+</body>
+</html>
