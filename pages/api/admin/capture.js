@@ -6,6 +6,10 @@ import { supabase } from "../../../lib/supabase";
  *
  * Called when delivery is confirmed. Does three things:
  *   1. Captures the pre-authorized PaymentIntent
+ *      — or, if the auth expired (e.g. delivery was rescheduled past
+ *        Stripe's 7-day hold window), charges the saved card fresh.
+ *      — or, if the money was already collected (manual re-charge in the
+ *        Stripe Dashboard, or a previous partial run), skips charging.
  *   2. Marks the order as "delivered"
  *   3. For rental orders: creates a Stripe Subscription for months 2+
  *
@@ -57,37 +61,111 @@ export default async function handler(req, res) {
     if (fetchErr || !order) {
       return res.status(404).json({ error: "Order not found" });
     }
-    if (order.status !== "authorized") {
+    // Normal path: "authorized". Also allow re-running on an order that got
+    // stuck halfway (e.g. money collected manually but no subscription yet):
+    // status "delivered" with no subscription on file.
+    const isRerun =
+      order.status === "delivered" && !order.stripe_subscription_id;
+    if (order.status !== "authorized" && !isRerun) {
       return res.status(400).json({
-        error: `Order status is "${order.status}", expected "authorized"`,
+        error: `Order status is "${order.status}", expected "authorized" (or "delivered" without a subscription for a re-run)`,
       });
     }
     if (!order.stripe_auth_pi_id) {
       return res.status(400).json({ error: "No pre-auth PaymentIntent on order" });
     }
 
-    // 2. Capture the pre-auth
-    const captured = await stripe.paymentIntents.capture(order.stripe_auth_pi_id);
-
-    // Update payment ledger: mark pre_auth as captured
-    await supabase
-      .from("payments")
-      .update({ status: "succeeded" })
-      .eq("stripe_payment_intent_id", order.stripe_auth_pi_id)
-      .eq("type", "pre_auth");
-
-    // Record capture in ledger
     const isRental = order.rental_monthly_cents > 0;
-    await supabase.from("payments").insert({
-      order_id: order.id,
-      type: isRental ? "pre_auth_capture" : "buy_capture",
-      amount_cents: order.authorized_amount_cents,
-      stripe_payment_intent_id: captured.id,
-      status: "succeeded",
-      description: isRental
-        ? `Captured: 1st month + deposit ($${(order.authorized_amount_cents / 100).toFixed(2)})`
-        : `Captured: purchase ($${(order.authorized_amount_cents / 100).toFixed(2)})`,
-    });
+
+    // 2. Collect the money — capture, fresh charge, or skip if already paid.
+    //
+    // First check the ledger: if a succeeded capture/charge already exists for
+    // this order (e.g. admin re-charged manually in the Stripe Dashboard after
+    // the auth expired), do NOT charge again.
+    const { data: priorCaptures } = await supabase
+      .from("payments")
+      .select("id, stripe_payment_intent_id, amount_cents")
+      .eq("order_id", order.id)
+      .in("type", ["pre_auth_capture", "buy_capture"])
+      .eq("status", "succeeded")
+      .limit(1);
+    const priorCapture = priorCaptures && priorCaptures[0];
+
+    let capturedPiId = null;
+
+    if (priorCapture) {
+      // Money already collected — skip straight to subscription/status.
+      capturedPiId = priorCapture.stripe_payment_intent_id;
+    } else {
+      const pi = await stripe.paymentIntents.retrieve(order.stripe_auth_pi_id);
+
+      if (pi.status === "requires_capture") {
+        // Normal path: capture the hold
+        const captured = await stripe.paymentIntents.capture(pi.id);
+        capturedPiId = captured.id;
+
+        await supabase
+          .from("payments")
+          .update({ status: "succeeded" })
+          .eq("stripe_payment_intent_id", order.stripe_auth_pi_id)
+          .eq("type", "pre_auth");
+      } else if (pi.status === "succeeded") {
+        // Hold was already captured (e.g. via Dashboard) — don't charge again
+        capturedPiId = pi.id;
+
+        await supabase
+          .from("payments")
+          .update({ status: "succeeded" })
+          .eq("stripe_payment_intent_id", order.stripe_auth_pi_id)
+          .eq("type", "pre_auth");
+      } else if (pi.status === "canceled") {
+        // Auth expired (Stripe cancels uncaptured holds after ~7 days —
+        // happens when delivery is rescheduled). Charge the saved card fresh.
+        if (!order.stripe_payment_method_id || !order.customers?.stripe_customer_id) {
+          return res.status(400).json({
+            error:
+              "Pre-auth expired and no saved payment method/customer to re-charge. Charge manually in Stripe, record it in payments, then re-run.",
+          });
+        }
+        const recharge = await stripe.paymentIntents.create({
+          amount: order.authorized_amount_cents,
+          currency: "usd",
+          customer: order.customers.stripe_customer_id,
+          payment_method: order.stripe_payment_method_id,
+          off_session: true,
+          confirm: true,
+          description: `Roomo re-charge after expired auth — order ${order.id.slice(0, 8)}`,
+          metadata: { order_id: order.id, reason: "auth_expired" },
+        });
+        capturedPiId = recharge.id;
+
+        // Mark the dead pre-auth row so the admin UI stops showing it as pending
+        await supabase
+          .from("payments")
+          .update({
+            status: "canceled",
+            description: "Pre-auth expired (delivery rescheduled past 7-day window)",
+          })
+          .eq("stripe_payment_intent_id", order.stripe_auth_pi_id)
+          .eq("type", "pre_auth");
+      } else {
+        return res.status(400).json({
+          error: `Pre-auth PaymentIntent has status "${pi.status}" — cannot capture or re-charge automatically.`,
+        });
+      }
+
+      // Record capture in ledger (only when this run actually collected money)
+      await supabase.from("payments").insert({
+        order_id: order.id,
+        type: isRental ? "pre_auth_capture" : "buy_capture",
+        amount_cents: order.authorized_amount_cents,
+        stripe_payment_intent_id: capturedPiId,
+        status: "succeeded",
+        description: isRental
+          ? `Captured: 1st month + deposit ($${(order.authorized_amount_cents / 100).toFixed(2)})`
+          : `Captured: purchase ($${(order.authorized_amount_cents / 100).toFixed(2)})`,
+      });
+    }
 
     // 3. For rental orders: create Stripe Subscription starting month 2
     let subscriptionId = null;
@@ -224,7 +302,9 @@ export default async function handler(req, res) {
       .from("orders")
       .update({
         status: finalStatus,
-        delivered_at: new Date().toISOString(),
+        // Keep an existing delivered_at (set manually or by a previous partial
+        // run) instead of overwriting it with today.
+        delivered_at: order.delivered_at || new Date().toISOString(),
         stripe_subscription_id: subscriptionId,
         subscription_ends_at: subscriptionEndsAt,
       })
@@ -236,6 +316,7 @@ export default async function handler(req, res) {
       success: true,
       orderId: order.id,
       captured: order.authorized_amount_cents,
+      alreadyPaid: !!priorCapture,
       subscriptionId,
       status: finalStatus,
     });
